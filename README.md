@@ -1,4 +1,18 @@
-# Halcyon
+# NeuroAdapt AI (Halcyon)
+
+**Current version:** a website that trains cognitive and memory skills by age group (1-5, 6-17, 18-60). Create an account, take a 5-game assessment, get a report and a level (Easy, Medium, Hard), then play a daily 10-game session that ends with a report comparing earlier days, with charts. 105 games, none shared between groups or levels.
+
+```bash
+python run.py        # then open http://127.0.0.1:8765/
+node --test tests/flow.test.mjs
+```
+
+* How the workflow and levels work: [WORKFLOW.md](WORKFLOW.md)
+* Storing accounts and results in Firebase (optional): [FIREBASE.md](FIREBASE.md)
+
+The sections below describe the earlier PyGame + MediaPipe runtime in `game/`. The website no longer uses it.
+
+---
 
 Calm, short cognitive games for autistic children and adolescents, played with **hand or body movement** (MediaPipe) **or** with mouse, touch and keyboard. A website handles sign-in, onboarding, recommendations, settings, progress and privacy; a **PyGame** runtime plays the games.
 
