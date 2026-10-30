@@ -1,0 +1,16 @@
+{
+  "camera_index": 0,
+  "camera_width": 640,
+  "camera_height": 480,
+  "fullscreen": false,
+  "no_camera": false,
+  "min_confidence": 0.55,
+  "low_light_threshold": 45,
+  "gestures": {
+    "select": "pinch",
+    "pause": "open_palm_hold",
+    "dwell_seconds": 0.9,
+    "palm_hold_seconds": 1.6,
+    "lean_threshold": 0.12
+  }
+}

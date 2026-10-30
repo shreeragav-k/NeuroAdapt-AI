@@ -1,0 +1,173 @@
+{
+  "age_range": [5, 17],
+  "phases": {
+    "starter": "Getting to know your pace",
+    "adaptive": "Adapting to you"
+  },
+  "dimensions": {
+    "pace": "Speed",
+    "load": "Challenge",
+    "visual": "Visual detail"
+  },
+  "games": [
+    {
+      "id": "lantern_memory",
+      "name": "Lantern Memory",
+      "phase": "starter",
+      "skill": "Working memory",
+      "tagline": "Watch the lanterns glow, then light them in the same order.",
+      "trial_seconds": 14,
+      "traits": ["visual", "calm", "no_time_pressure"],
+      "steps": {
+        "short": "Watch the lanterns. Light them in the same order.",
+        "steps": ["Lanterns glow one at a time.", "Wait until they stop.", "Select the lanterns in the same order."],
+        "visual": ["Watch", "Wait", "Repeat"]
+      }
+    },
+    {
+      "id": "quiet_signals",
+      "name": "Quiet Signals",
+      "phase": "starter",
+      "skill": "Response inhibition",
+      "tagline": "Gather the golden blooms. Let the closed buds rest.",
+      "trial_seconds": 5,
+      "traits": ["visual", "quick", "calm"],
+      "steps": {
+        "short": "Select golden flowers. Leave grey buds alone.",
+        "steps": ["A flower appears on the pond.", "If it is golden, select it.", "If it is a grey bud, wait. It will fade."],
+        "visual": ["Golden = select", "Grey = wait", "That is all"]
+      }
+    },
+    {
+      "id": "sorting_stones",
+      "name": "Sorting Stones",
+      "phase": "starter",
+      "skill": "Cognitive flexibility",
+      "tagline": "Sort river stones by the rule on the card. Rules change with a clear signal.",
+      "trial_seconds": 4,
+      "traits": ["visual", "predictable", "left_right"],
+      "steps": {
+        "short": "Follow the card. Send each stone left or right.",
+        "steps": ["Read the rule card at the top.", "Send each stone to the matching basket.", "When the card changes, you will see a signal first."],
+        "visual": ["Read the card", "Left or right", "Card changes: new rule"]
+      }
+    },
+    {
+      "id": "meadow_search",
+      "name": "Meadow Search",
+      "phase": "starter",
+      "skill": "Focused attention",
+      "tagline": "Find the one flower that is different from the others.",
+      "trial_seconds": 9,
+      "traits": ["visual", "calm", "no_time_pressure"],
+      "steps": {
+        "short": "Find the flower that is different. Select it.",
+        "steps": ["Look across the meadow.", "One flower is different.", "Select it."],
+        "visual": ["Look", "Spot the odd one", "Select"]
+      }
+    },
+    {
+      "id": "constellation_trace",
+      "name": "Constellation Trace",
+      "phase": "starter",
+      "skill": "Planning and sequencing",
+      "tagline": "Join the stars in order to draw the constellation.",
+      "trial_seconds": 22,
+      "traits": ["visual", "calm", "no_time_pressure"],
+      "steps": {
+        "short": "Select the stars in order, 1, 2, 3 and on.",
+        "steps": ["Find star number 1.", "Then star number 2, and so on.", "A thread of light joins them."],
+        "visual": ["1", "2", "3 ..."]
+      }
+    },
+    {
+      "id": "echo_garden",
+      "name": "Echo Garden",
+      "phase": "adaptive",
+      "skill": "Working memory (n-back)",
+      "tagline": "Is this flower the same as the one before?",
+      "trial_seconds": 4,
+      "traits": ["visual", "left_right", "predictable"],
+      "steps": {
+        "short": "Is it the same as before? Choose Same or Different.",
+        "steps": ["One flower shows at a time.", "Compare it with the previous one.", "Choose Same or Different."],
+        "visual": ["Look", "Compare", "Same / Different"]
+      }
+    },
+    {
+      "id": "pattern_loom",
+      "name": "Pattern Loom",
+      "phase": "adaptive",
+      "skill": "Pattern reasoning",
+      "tagline": "Work out the rule and choose the tile that finishes the pattern.",
+      "trial_seconds": 12,
+      "traits": ["visual", "calm", "no_time_pressure"],
+      "steps": {
+        "short": "Find the rule. Choose the tile that fits the gap.",
+        "steps": ["Look at the row of tiles.", "Find what changes each time.", "Choose the tile that fits the gap."],
+        "visual": ["Look", "Find the rule", "Fill the gap"]
+      }
+    },
+    {
+      "id": "steady_beat",
+      "name": "Steady Beat",
+      "phase": "adaptive",
+      "skill": "Sustained attention and timing",
+      "tagline": "Select as the ring meets the circle. A slow, even rhythm.",
+      "trial_seconds": 2,
+      "traits": ["rhythm", "movement", "calm", "quick"],
+      "steps": {
+        "short": "Select just as the ring reaches the circle.",
+        "steps": ["A ring slowly closes in.", "When it meets the circle, select.", "The rhythm stays the same."],
+        "visual": ["Ring closes", "Meets circle", "Select"]
+      }
+    },
+    {
+      "id": "mirror_match",
+      "name": "Mirror Match",
+      "phase": "adaptive",
+      "skill": "Visual-spatial reasoning",
+      "tagline": "Which pattern is the mirror image?",
+      "trial_seconds": 11,
+      "traits": ["visual", "calm", "no_time_pressure"],
+      "steps": {
+        "short": "Find the mirror image of the pattern.",
+        "steps": ["Look at the pattern on the left.", "Imagine it in a mirror.", "Select the matching reflection."],
+        "visual": ["Look", "Mirror it", "Select"]
+      }
+    },
+    {
+      "id": "firefly_count",
+      "name": "Firefly Count",
+      "phase": "adaptive",
+      "skill": "Quick counting",
+      "tagline": "A few fireflies glow for a moment. How many were there?",
+      "trial_seconds": 7,
+      "traits": ["visual", "quick", "calm"],
+      "steps": {
+        "short": "Fireflies glow briefly. Select how many you saw.",
+        "steps": ["Fireflies glow in the jar.", "They fade after a moment.", "Select the number you saw."],
+        "visual": ["Glow", "Fade", "How many?"]
+      }
+    }
+  ],
+  "profile_options": {
+    "self_described": [
+      {"id": "autistic", "label": "Autistic"},
+      {"id": "autistic_adhd", "label": "Autistic, with ADHD"},
+      {"id": "autistic_other", "label": "Autistic, with another difference"},
+      {"id": "other", "label": "Something else"},
+      {"id": "prefer_not", "label": "Prefer not to say"}
+    ],
+    "traits": [
+      {"id": "predictable_routines", "label": "Prefers predictable routines"},
+      {"id": "sound_sensitive", "label": "Sensitive to sound"},
+      {"id": "motion_sensitive", "label": "Sensitive to movement on screen"},
+      {"id": "light_sensitive", "label": "Sensitive to bright or flashing light"},
+      {"id": "fewer_words", "label": "Prefers fewer words"},
+      {"id": "likes_patterns", "label": "Enjoys patterns and sequences"},
+      {"id": "needs_time", "label": "Likes extra time to respond"},
+      {"id": "fine_motor", "label": "Finds precise pointing tiring"}
+    ]
+  }
+}

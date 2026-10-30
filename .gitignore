@@ -1,0 +1,8 @@
+# local runtime data and settings
+data/
+config.json
+__pycache__/
+*.pyc
+.claude/
+.env
+node_modules/
