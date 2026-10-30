@@ -10,6 +10,7 @@
 // simply played again from its first round.
 
 import { makeGame, shapeSvg } from "./engines.js";
+import * as Sound from "./sound.js";
 
 const $ = (sel, root) => root.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -19,24 +20,28 @@ export function playGame({ host, game, rounds, stepFor, onRound, onDone, rng = M
   const inst = makeGame(game, rng);
   const total = inst.rounds(rounds.isTest, rounds.defaults);
   const trials = [];
-  let dead = false, timers = [], offKey = null;
+  let dead = false, timers = [], offKey = null, streak = 0;
 
   const later = (fn, ms) => { const t = setTimeout(() => { if (!dead) fn(); }, ms); timers.push(t); return t; };
   const stop = () => { dead = true; timers.forEach((t) => (t && t.cancel ? t.cancel() : clearTimeout(t))); offKey && offKey(); host.replaceChildren(); };
 
   const frame = (i, prompt, body, extra = "") => {
     host.innerHTML = `<div class="play tier${tier}">
-      <div class="play-head"><span class="muted small">Round ${i + 1} of ${total}</span><span class="dots" aria-hidden="true">${Array.from({ length: total }, (_, k) => `<i class="${k < i ? "on" : ""}"></i>`).join("")}</span></div>
+      <div class="play-head"><span class="muted small">Round ${i + 1} of ${total}${streak >= 2 ? `<b class="streak"> · ${streak} in a row</b>` : ""}</span><span class="dots" aria-hidden="true">${Array.from({ length: total }, (_, k) => `<i class="${k < i ? "on" : ""}"></i>`).join("")}</span></div>
       <p class="prompt" id="prompt" role="status">${esc(prompt)}</p>${extra}
       <div class="stage" id="stage">${body}</div></div>`;
     return $("#stage", host);
   };
+
+  const timerBar = (ms) => `<div class="timerbar" aria-hidden="true"><i style="animation-duration:${ms}ms"></i></div>`;
 
   function finishRound(i, step, ok, started, feedback = "") {
     if (dead) return;
     const rt = Math.max(0, Math.round(performance.now() - started));
     const t = { step, correct: !!ok, rt };
     trials.push(t);
+    streak = ok ? streak + 1 : 0;
+    Sound.chime(!!ok);
     onRound && onRound(t);
     const stage = $("#stage", host);
     if (stage) {
@@ -52,19 +57,33 @@ export function playGame({ host, game, rounds, stepFor, onRound, onDone, rng = M
   // ---------------------------------------------------------------- choice
   function runChoice(i, step, d) {
     let started = 0, locked = false;
-    const optHtml = () => `<div class="opts cols${d.cols || d.options.length} ${d.layout || ""} ${d.size || ""}">${d.options.map((o, k) => `<button type="button" class="opt" data-k="${k}" aria-label="Option ${k + 1}"><span class="n" aria-hidden="true">${k + 1}</span>${o.html}</button>`).join("")}</div>`;
+    const optHtml = () => `<div class="opts cols${d.cols || d.options.length} ${d.layout || ""} ${d.size || ""}">${d.options.map((o, k) => `<button type="button" class="opt" data-k="${k}" aria-label="Option ${k + 1}"${d.multi ? ' aria-pressed="false"' : ""}><span class="n" aria-hidden="true">${k + 1}</span>${o.html}</button>`).join("")}</div>${d.multi ? `<button type="button" class="btn" id="done">Done</button>` : ""}`;
     const wire = (stage) => {
       started = performance.now();
       stage.querySelectorAll(".opt").forEach((b) => (b.onclick = () => pick(Number(b.dataset.k))));
+      const dn = $("#done", stage); if (dn) dn.onclick = submitMulti;
       offKey && offKey();
       const onKey = (e) => { const k = Number(e.key) - 1; if (k >= 0 && k < d.options.length) pick(k); };
       document.addEventListener("keydown", onKey); offKey = () => document.removeEventListener("keydown", onKey);
     };
     const pick = (k) => {
-      if (locked || dead) return; locked = true; offKey && offKey(); offKey = null;
+      if (locked || dead) return;
       const stage = $("#stage", host);
+      if (d.multi) { const b = stage.querySelectorAll(".opt")[k]; b.classList.toggle("picked"); b.setAttribute("aria-pressed", b.classList.contains("picked")); return; }
+      locked = true; offKey && offKey(); offKey = null;
       stage.querySelectorAll(".opt").forEach((b, j) => { b.disabled = true; if (j === d.answer) b.classList.add("is-right"); else if (j === k) b.classList.add("is-wrong"); });
       finishRound(i, step, k === d.answer, started);
+    };
+    // memory basket: pick everything that was shown, then press Done
+    const submitMulti = () => {
+      if (locked || dead) return; locked = true; offKey && offKey(); offKey = null;
+      const stage = $("#stage", host), opts = [...stage.querySelectorAll(".opt")];
+      const chosen = opts.map((b, j) => (b.classList.contains("picked") ? j : -1)).filter((j) => j >= 0);
+      const hits = chosen.filter((j) => d.answers.includes(j)).length, extra = chosen.length - hits;
+      opts.forEach((b, j) => { b.disabled = true; if (d.answers.includes(j)) b.classList.add(b.classList.contains("picked") ? "is-right" : "is-missed"); else if (b.classList.contains("picked")) b.classList.add("is-wrong"); });
+      const dn = $("#done", stage); if (dn) dn.disabled = true;
+      const ok = hits === d.answers.length && extra <= (d.allowed || 0);
+      finishRound(i, step, ok, started, ok ? "You remembered them all." : `You found ${hits} of ${d.answers.length}${extra ? ` and picked ${extra} that ${extra === 1 ? "was" : "were"} not there` : ""}.`);
     };
     const banner = d.banner ? `<p class="banner">${esc(d.banner)}</p>` : "";
     const stim = (h, cls = "") => (h ? `<div class="stim ${cls}">${h}</div>` : "");
@@ -79,9 +98,10 @@ export function playGame({ host, game, rounds, stepFor, onRound, onDone, rng = M
         }
       }
       if (d.showMs) {
-        frame(i, d.prompt, `${banner}${stim(d.stimulus)}`);
+        // the shrinking bar shows how long the study time lasts
+        frame(i, d.prompt, `${banner}${stim(d.stimulus)}`, timerBar(d.showMs));
         // delayed recall: a short distraction fills the gap before the question
-        later(d.delayMs ? () => { frame(i, d.delayText, `<div class="stim"><span class="tx huge">…</span></div>`); later(showOptions, d.delayMs); } : showOptions, d.showMs);
+        later(d.delayMs ? () => { frame(i, d.delayText, `<div class="stim"><span class="tx huge">…</span></div>`, timerBar(d.delayMs)); later(showOptions, d.delayMs); } : showOptions, d.showMs);
       } else {
         const stage = frame(i, d.prompt, `${banner}${stim(d.stimulus)}${optHtml()}`);
         wire(stage);
@@ -100,7 +120,7 @@ export function playGame({ host, game, rounds, stepFor, onRound, onDone, rng = M
     const showNext = () => {
       if (k >= d.items.length) { centre.textContent = ""; $("#prompt", host).textContent = d.ask; pads.forEach((p) => (p.disabled = false)); started = performance.now(); return; }
       const id = d.items[k++], pad = byId(id);
-      if (d.centre) { centre.innerHTML = pad.innerHTML; } else pad.classList.add("lit");
+      if (d.centre) { centre.innerHTML = pad.innerHTML; } else { pad.classList.add("lit"); Sound.tone(Sound.padFreq(pads.indexOf(pad)), Math.min(d.onMs, 420)); }
       later(() => { pad.classList.remove("lit"); centre.textContent = ""; later(showNext, 260); }, d.onMs);
     };
     later(showNext, 700);
@@ -108,6 +128,7 @@ export function playGame({ host, game, rounds, stepFor, onRound, onDone, rng = M
     pads.forEach((p) => (p.onclick = () => {
       if (done || p.disabled) return;
       p.classList.add("lit"); later(() => p.classList.remove("lit"), 200);
+      if (!d.centre) Sound.tone(Sound.padFreq(pads.indexOf(p)), 220);
       if (p.dataset.id !== d.expected[got]) { done = true; pads.forEach((x) => (x.disabled = true)); return finishRound(i, step, false, started, "That was a different one."); }
       got++;
       if (got === d.expected.length) { done = true; pads.forEach((x) => (x.disabled = true)); finishRound(i, step, true, started, "Every one in the right order."); }
@@ -162,17 +183,17 @@ export function playGame({ host, game, rounds, stepFor, onRound, onDone, rng = M
 
   // ---------------------------------------------------------------- timing
   function runTiming(i, step, d) {
-    const stage = frame(i, d.prompt, `<div class="track"><span class="zone" style="left:${d.zone[0] * 100}%;width:${(d.zone[1] - d.zone[0]) * 100}%"></span><span class="mover" id="mover"></span></div><button type="button" class="btn stopbtn" id="stop">Stop</button>`);
+    const stage = frame(i, d.prompt, `<div class="track"><span class="zone" style="left:${d.zone[0] * 100}%;width:${(d.zone[1] - d.zone[0]) * 100}%"></span><span class="mover${d.icon ? " icon" : ""}" id="mover">${d.icon || ""}</span></div><button type="button" class="btn stopbtn" id="stop">Stop</button>`);
     const mover = $("#mover", stage), t0 = performance.now(); let raf = 0, done = false;
     const pos = () => { const ph = ((performance.now() - t0) / d.periodMs) % 2; return ph < 1 ? ph : 2 - ph; };
     const tick = () => {
       if (done || dead) return;
-      mover.style.left = `calc(${pos() * 100}% - 14px)`;
+      mover.style.left = `${pos() * 100}%`;
       if (performance.now() - t0 > d.periodMs * 2 * d.maxPasses) { done = true; return finishRound(i, step, false, t0, "The bus drove past."); }
       raf = requestAnimationFrame(tick);
     };
     tick();
-    $("#stop", stage).onclick = () => { if (done) return; done = true; cancelAnimationFrame(raf); const p = pos(); mover.style.left = `calc(${p * 100}% - 14px)`; const ok = p >= d.zone[0] && p <= d.zone[1]; finishRound(i, step, ok, t0, ok ? "Right on the stop." : "Just missed the stop."); };
+    $("#stop", stage).onclick = () => { if (done) return; done = true; cancelAnimationFrame(raf); const p = pos(); mover.style.left = `${p * 100}%`; const ok = p >= d.zone[0] && p <= d.zone[1]; finishRound(i, step, ok, t0, ok ? "Right on the stop." : "Just missed the stop."); };
     timers.push({ cancel: () => cancelAnimationFrame(raf) });
   }
 

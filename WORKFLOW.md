@@ -33,21 +33,37 @@ Age 18 belongs to g3 so that no age sits in two groups. Change the limits in `GR
 | medium | 10 | daily sessions at Medium |
 | hard | 10 | daily sessions at Hard |
 
-Every game is a standard cognitive task, and about half of them train memory. Games by skill area:
+**In order of difficulty.** Every game has a difficulty rank inside its set. The five assessment games are played from the easiest to the most demanding, and each daily session runs from a warm-up to the hardest game of the level. Before each game the player sees its rank (for example "game 3 of 10, easiest to hardest").
+
+**Every game is a named cognitive task**, shown on a task card before play: the skill area, the classic task it is based on (digit span, Corsi blocks, n-back, delayed match-to-sample, paired-associate learning, Go/No-Go, Stroop, flanker, task switching, trail making, matrix reasoning and so on) and what it trains. About half of them train memory:
 
 | Skill area | Ages 1 to 5 | Ages 6 to 17 | Ages 18 to 60 |
 |---|---|---|---|
-| Memory | 18 | 17 | 19 |
-| Attention | 9 | 5 | 3 |
+| Memory | 21 | 18 | 20 |
+| Attention | 7 | 5 | 3 |
 | Self-control | 2 | 3 | 2 |
-| Reasoning | 3 | 6 | 5 |
-| Flexible thinking | 1 | 1 | 1 |
+| Reasoning | 2 | 4 | 4 |
+| Flexible thinking | 1 | 2 | 1 |
 | Spatial thinking | 0 | 2 | 2 |
 | Processing speed | 2 | 1 | 3 |
 
-The memory tasks are: short-term and span tasks (colour, shape and position sequences, Corsi blocks, digits and letters forwards and backwards, letter-number sequencing), visual and verbal recognition (what did you see, what went missing), delayed recall after a distraction (clapping or counting backwards), object-location memory, spatial layout recall, story recall, paired associates (shape-colour, word-number, name-job, word pairs), card-pair concentration and n-back. The rest train selective attention (visual search, flanker), response inhibition (go/no-go, Stroop), mental flexibility (task switching), reasoning (pattern series, matrices, analogies, logic), spatial thinking (mirror, rotation, route following) and processing speed (symbol coding, reaction, timing).
+**Memory games**
+* Working and short-term memory: animal, fruit and position sequences that light up and play notes (Simon / Corsi), digit and letter spans forwards and backwards, mixed letter-number sequencing, n-back with animals, letters, positions and digits.
+* Visual and verbal recognition: "what did you see", "what went missing", and the **memory basket** (study several pictures or words, then pick all of them among look-alikes).
+* Delayed recall: the same, with a distraction in the gap (clapping, counting backwards from 10, counting backwards from 50 in threes).
+* Spatial memory: where each picture, number, letter, word or symbol sat in a grid; lit-square layouts; card pairs.
+* Associative memory: which colour each animal was, which number went with which word, which job with which name, word pairs, number-and-dots pairs.
+* Episodic memory: short stories, news items and schedules, with a question about a detail.
 
-Each game is tuned to its age group: for ages 1 to 5 only shapes, colours and small sets with big touch targets and no reading; for 6 to 17 digits, letters and words with spans up to six; for 18 to 60 longer spans, 2-back, delays with counting backwards in threes, and multi-detail stories. Within a set no two games use the same engine, and no engine + content + mode combination is used twice anywhere. `tests/flow.test.mjs` checks this and that each game's answer is really right.
+**Attention, control, reasoning**: picture and letter search (cancellation), flanker, Go/No-Go with pictures, Stroop, rule switching, Trail Making B, pattern series, matrix puzzles, analogies, logic, mirror and rotation, route following, symbol coding.
+
+**Pictures and feedback.** 26 illustrated pictures (animals, fruit, vehicles, everyday things) can take any body colour, so games can ask "what" and "which colour". Memory games show a shrinking study-time bar, correct and wrong answers play a soft chime, sequence pads play notes (switch sound off with the top-bar button), and a streak counter and star rating (1 to 3) reward a good run.
+
+**Each game is tuned to its age group.** Ages 1 to 5: pictures, colours and small sets, large targets, no reading. Ages 6 to 17: digits, letters, words, spans up to six, stories. Ages 18 to 60: longer spans, 2-back, delays with counting backwards in threes, multi-detail schedules, relationship analogies.
+
+**Suggestions follow the player's level.** The level (Easy, Medium, Hard) picks the 10 games; the plan page then marks the games for the player's two weakest skill areas as "focus", using the latest report.
+
+Within a set no two games use the same engine, and no engine + content + mode combination is used twice anywhere. `tests/flow.test.mjs` checks this, the difficulty order, and that each game's answer is really right.
 
 ## Assessment and level
 Each assessment game has 6 rounds on a staircase from step 1 to 6, starting at 3: a right answer moves one step up, a wrong one one step down. Game ability = average of the steps played plus the step that would come next. Overall ability = average of the 5 games.

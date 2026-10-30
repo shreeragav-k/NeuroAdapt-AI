@@ -174,3 +174,27 @@ input[type=email] { width: 100%; }
 .analogy { font-family: var(--serif); font-size: clamp(1.6rem, 4vw, 2.4rem); text-align: center; }
 .pads.grid6 { grid-template-columns: repeat(6, 4.4rem); }
 @media (max-width: 700px) { .pads.grid6 { grid-template-columns: repeat(6, 3.3rem); } .matrix td { width: 4rem; height: 4rem; } }
+
+/* ---- enhanced games: pictures, study timer, task card, areas, stars */
+:root { --a-memory: #2b6e6a; --a-attention: #b8893a; --a-self-control: #8b5a8c; --a-reasoning: #4a6fa5; --a-flexible-thinking: #5f8a3a; --a-spatial-thinking: #8b5e3c; --a-processing-speed: #c4553d; }
+.area-memory { --area: var(--a-memory); } .area-attention { --area: var(--a-attention); } .area-self-control { --area: var(--a-self-control); }
+.area-reasoning { --area: var(--a-reasoning); } .area-flexible-thinking { --area: var(--a-flexible-thinking); } .area-spatial-thinking { --area: var(--a-spatial-thinking); } .area-processing-speed { --area: var(--a-processing-speed); }
+.play-wrap .play { border-top: 5px solid var(--area, var(--teal)); }
+.play-wrap .eyebrow, .taskcard .eyebrow { color: var(--area, var(--teal)); }
+.pic { display: block; }
+.timerbar { height: 8px; background: var(--stone); border-radius: 6px; overflow: hidden; margin: -.4rem 0 1rem; }
+.timerbar i { display: block; height: 100%; width: 100%; background: var(--area, var(--teal)); border-radius: 6px; transform-origin: left; animation: shrink linear forwards; }
+@keyframes shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.streak { color: var(--area, var(--teal-deep)); font-weight: 600; }
+.opt.picked { border-color: var(--area, var(--teal)); background: var(--teal-pale); box-shadow: 0 0 0 2px var(--area, var(--teal)) inset; }
+.opt.is-missed { border-color: var(--amber); background: #f3e9d2; }
+.taskcard .task { display: grid; gap: .9rem; margin: 1.6rem 0 1.4rem; padding: 1.2rem 1.4rem; background: var(--paper); border: 1px solid var(--line); border-left: 5px solid var(--area, var(--teal)); border-radius: 14px; }
+.task dt { font-size: .74rem; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+.task dd { margin: .15rem 0 0; }
+.areachip { display: inline-block; padding: .12rem .7rem; border-radius: 999px; background: var(--area, var(--teal)); color: #fff; font-size: .82rem; font-weight: 600; margin-right: .4rem; }
+.stars { display: flex; gap: .5rem; margin: .4rem 0 1rem; }
+.tag.focus { background: #f3e9d2; color: #5d4720; font-style: normal; margin-left: .4rem; }
+.track .mover.icon { width: 44px; height: 44px; margin-top: -22px; background: none; transform: translateX(-50%); display: grid; place-items: center; }
+.track .mover { transform: translateX(-50%); }
+.plan li.done span { color: var(--teal-deep); }
+@media (prefers-reduced-motion: reduce) { .timerbar i { animation-duration: .01ms !important; } }

@@ -7,8 +7,9 @@
 // tier 0/1/2, which scales ranges (counts, lengths, speed) for the age group.
 
 import {
-  GROUPS, WORD_LISTS, FOILS, CATEGORY_PROMPT, OPPOSITES, LOOKALIKE_DIGITS, NAMES, GREEK, SYLLOGISMS, STORIES, ANALOGIES,
+  GROUPS, WORD_LISTS, FOILS, OPPOSITES, LOOKALIKE_DIGITS, NAMES, GREEK, SYLLOGISMS, STORIES, ANALOGIES,
 } from "./data.js";
+import { pictureSvg, ANIMALS, FRUITS, VEHICLES, THINGS, ALL_PICTURES, PICTURE_SETS } from "./art.js";
 
 // -------------------------------------------------------------- small helpers
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
@@ -109,15 +110,17 @@ const choice = (o) => ({ kind: "choice", showMs: 0, ...o });
 // ------------------------------------------------------------------- engines
 const E = {};
 
-// ---- match: find the identical shape
+// ---- match: find the identical picture
 E.match = ({ tier, rng, content }) => ({
   trial(i, s) {
-    if (content !== "shape") throw new Error("match: " + content);
+    if (content !== "pictures") throw new Error("match: " + content);
     const nOpt = at([[2, 2, 3, 3, 4, 4], [3, 3, 4, 4, 5, 5], [4, 4, 5, 5, 6, 6]][tier], s);
-    const pool = shapePool(tier), sh = pick(rng, pool);
-    const col = () => (s >= 3 ? COLORS[pick(rng, COLOR_NAMES)] : NEUTRAL);
-    const wrong = take(rng, pool.filter((x) => x !== sh), nOpt - 1).map((n) => ({ key: n, html: shapeSvg(n, col(), 72) }));
-    return choice({ prompt: "Tap the same shape.", stimulus: shapeSvg(sh, NEUTRAL, 96), ...choose(rng, { key: sh, html: shapeSvg(sh, col(), 72) }, wrong, nOpt), size: "lg" });
+    const sample = pick(rng, ALL_PICTURES);
+    const group = [ANIMALS, FRUITS, VEHICLES, THINGS].find((g) => g.includes(sample));
+    const pool = (s >= 3 ? group : ALL_PICTURES).filter((x) => x !== sample);
+    const rest = ALL_PICTURES.filter((x) => x !== sample && !pool.includes(x));
+    const wrong = [...take(rng, pool, nOpt - 1), ...take(rng, rest, nOpt)].map((n) => ({ key: n, html: pictureSvg(n, 74) }));
+    return choice({ prompt: "Tap the same picture.", stimulus: pictureSvg(sample, 110), ...choose(rng, { key: sample, html: pictureSvg(sample, 74) }, wrong, nOpt), size: "lg" });
   },
 });
 
@@ -129,26 +132,14 @@ E.odd = ({ tier, rng, content }) => ({
     const oddAt = rint(rng, 0, N - 1);
     const cells = (render) => Array.from({ length: N }, (_, j) => render(j === oddAt));
     const out = (html, prompt = "Tap the one that is different.") => choice({ prompt, options: html.map((h, j) => ({ key: String(j), html: h })), answer: oddAt, cols });
-    if (content === "shape") {
-      const pool = shapePool(tier), a = pick(rng, pool), b = pick(rng, pool.filter((x) => x !== a)), col = () => (s >= 3 ? COLORS[pick(rng, COLOR_NAMES)] : NEUTRAL);
-      return out(cells((isOdd) => shapeSvg(isOdd ? b : a, col(), 56)));
-    }
-    if (content === "color") {
-      if (s <= 2) { const [a, b] = take(rng, COLOR_NAMES, 2); return out(cells((o) => swatch(o ? b : a, 60))); }
-      const hue = rint(rng, 0, 359), d = at([0, 0, 30, 24, 18, 14], s) * (rng() < 0.5 ? 1 : -1);
-      return out(cells((o) => `<span class="sw" style="background:${hsl(hue, 65, 52 + (o ? d : 0))};width:60px;height:60px"></span>`));
+    if (content === "animals" || content === "things") {
+      const pool = PICTURE_SETS[content], a = pick(rng, pool), b = pick(rng, pool.filter((x) => x !== a));
+      const tint = () => (s >= 3 ? COLORS[pick(rng, COLOR_NAMES)] : null);       // from step 3 the colours are a distraction
+      return out(cells((isOdd) => pictureSvg(isOdd ? b : a, 62, tint())));
     }
     if (content === "size") {
-      const r = at([1.8, 1.6, 1.4, 1.3, 1.22, 1.15], s), big = rng() < 0.5, col = pick(rng, COLOR_NAMES);
-      return out(cells((o) => `<span class="slot">${shapeSvg("circle", COLORS[col], Math.round(o ? (big ? 48 * r : 48 / r) : 48))}</span>`));
-    }
-    if (content === "pattern") {
-      const n = 3, p = randPattern(rng, n), q = mutate(rng, p, at([3, 3, 2, 2, 1, 1], s));
-      return out(cells((o) => patternSvg(o ? q : p, n, 60)));
-    }
-    if (content === "number") {
-      const [a, b] = s >= 3 ? (rng() < 0.5 ? pick(rng, LOOKALIKE_DIGITS) : pick(rng, LOOKALIKE_DIGITS).slice().reverse()) : take(rng, "0123456789".split(""), 2);
-      return out(cells((o) => txt(o ? b : a, "big")));
+      const r = at([1.8, 1.6, 1.4, 1.3, 1.22, 1.15], s), big = rng() < 0.5, p = pick(rng, ANIMALS);
+      return out(cells((o) => `<span class="slot">${pictureSvg(p, Math.round(o ? (big ? 52 * r : 52 / r) : 52))}</span>`));
     }
     if (content === "rotation") {
       const n = 3; let p, ok = false;
@@ -171,12 +162,11 @@ E.compare = ({ rng, content }) => ({
   },
 });
 
-// ---- recall (seen / missing), delayed recall, object location, story recall, paired associates, matrix, analogy
+// ---- recall (seen / missing), delayed recall, memory basket, object location, story recall, paired associates, matrix, analogy
 const WORD_POOL = [...WORD_LISTS.animals, ...WORD_LISTS.food, ...WORD_LISTS.nature];
 function itemPool(content, tier) {
-  if (content === "shapes") return shapePool(tier);
-  if (content === "colors") return COLOR_NAMES;
-  if (content === "shapecolor") return shapePool(tier).flatMap((a) => COLOR_NAMES.map((b) => `${a}|${b}`));
+  if (PICTURE_SETS[content]) return PICTURE_SETS[content];
+  if (content === "tinted") return ANIMALS.flatMap((a) => COLOR_NAMES.map((b) => `${a}|${b}`));
   if (content === "digits") return "123456789".split("");
   if (content === "letters") return "BCDFGHJKLMNPQRSTVWXZ".split("");
   if (content === "words") return WORD_POOL;
@@ -184,9 +174,8 @@ function itemPool(content, tier) {
   throw new Error("unknown item kind " + content);
 }
 function itemHtml(content, v, px = 62) {
-  if (content === "shapes") return shapeSvg(v, NEUTRAL, px);
-  if (content === "colors") return swatch(v, px);
-  if (content === "shapecolor") { const [a, b] = v.split("|"); return shapeSvg(a, COLORS[b], px); }
+  if (PICTURE_SETS[content]) return pictureSvg(v, px);
+  if (content === "tinted") { const [a, b] = v.split("|"); return pictureSvg(a, px, COLORS[b], v); }
   return txt(v, content === "words" ? "word" : "big");
 }
 const rowOf = (content, arr) => `<div class="rowset">${arr.map((v) => itemHtml(content, v)).join("")}</div>`;
@@ -225,12 +214,29 @@ E.delayed = (ctx) => ({
   },
 });
 
+// memory basket: study several items, then tap ALL of them among look-alikes
+E.basket = ({ tier, rng, content }) => ({
+  trial(i, s) {
+    const pool = content === "words" ? WORD_POOL : PICTURE_SETS[content];
+    if (!pool) throw new Error("basket: " + content);
+    const kind = content === "words" ? "words" : content, k = Math.min(at([[2, 2, 2, 3, 3, 3], [3, 3, 4, 4, 5, 5], [4, 4, 5, 5, 6, 6]][tier], s), Math.floor(pool.length / 2));
+    const seen = take(rng, pool, k), unseen = take(rng, pool.filter((v) => !seen.includes(v)), k);
+    const options = shuffle(rng, [...seen, ...unseen]).map((v) => ({ key: v, html: itemHtml(kind, v, tier === 0 ? 72 : 60) }));
+    const answers = options.map((o, j) => (seen.includes(o.key) ? j : -1)).filter((j) => j >= 0);
+    return choice({
+      prompt: "Remember everything in the basket.", showMs: (tier === 0 ? 2500 : 1500) + k * 1200, ask: `Tap all ${k} things you saw, then press Done.`,
+      stimulus: rowOf(kind, seen), options, multi: true, answers, answer: answers[0], allowed: tier === 0 || s <= 2 ? 1 : 0,
+      cols: options.length <= 4 ? 2 : options.length <= 6 ? 3 : 4, meta: { seen },
+    });
+  },
+});
+
 // object location: which cell held this item?
 E.objloc = ({ tier, rng, content }) => ({
   trial(i, s) {
     const n = at([[2, 2, 3, 3, 3, 3], [3, 3, 3, 4, 4, 4], [3, 4, 4, 4, 5, 5]][tier], s), k = at([[1, 2, 2, 2, 3, 3], [2, 2, 3, 3, 4, 4], [3, 3, 3, 4, 4, 5]][tier], s);
     const items = take(rng, itemPool(content, tier), k), all = Array.from({ length: n * n }, (_, j) => j), cells = take(rng, all, k);
-    const grid = `<div class="locgrid" style="grid-template-columns:repeat(${n},1fr)">${all.map((c) => { const j = cells.indexOf(c); return `<span class="lc">${j >= 0 ? itemHtml(content, items[j], 44) : ""}</span>`; }).join("")}</div>`;
+    const grid = `<div class="locgrid" style="grid-template-columns:repeat(${n},1fr)">${all.map((c) => { const j = cells.indexOf(c); return `<span class="lc">${j >= 0 ? itemHtml(content, items[j], 52) : ""}</span>`; }).join("")}</div>`;
     const t = rint(rng, 0, k - 1), want = cells[t];
     const mini = (c) => patternSvg(all.map((j) => (j === c ? 1 : 0)), n, 74);
     const r = choose(rng, { key: String(want), html: mini(want) }, shuffle(rng, all.filter((c) => c !== want)).map((c) => ({ key: String(c), html: mini(c) })), 4);
@@ -252,10 +258,10 @@ E.assoc = ({ tier, rng, content }) => ({
     const k = at([[2, 2, 2, 3, 3, 3], [3, 3, 4, 4, 5, 5], [4, 4, 5, 5, 6, 6]][tier], s), nOpt = tier === 0 ? 3 : 4;
     const row = (a, b) => `<div class="studyrow">${a}<i>→</i>${b}</div>`;
     let pairs, pool, ask;
-    if (content === "shapecolor") {
-      const sh = take(rng, shapePool(tier), k), co = take(rng, COLOR_NAMES, k);
-      pairs = sh.map((a, j) => ({ cue: { key: a, html: shapeSvg(a, NEUTRAL, 80) }, ans: { key: co[j], html: swatch(co[j], 56) }, study: `<div class="studyrow">${shapeSvg(a, COLORS[co[j]], 64)}</div>` }));
-      pool = COLOR_NAMES.map((c) => ({ key: c, html: swatch(c, 56) })); ask = "What colour was this shape?";
+    if (content === "animalcolor") {
+      const an = take(rng, ANIMALS, k), co = take(rng, COLOR_NAMES, k);
+      pairs = an.map((a, j) => ({ cue: { key: a, html: pictureSvg(a, 84, "#cfc9bb") }, ans: { key: co[j], html: swatch(co[j], 56) }, study: `<div class="studyrow">${pictureSvg(a, 72, COLORS[co[j]], `${a}|${co[j]}`)}</div>` }));
+      pool = COLOR_NAMES.map((c) => ({ key: c, html: swatch(c, 56) })); ask = "What colour was this animal?";
     } else if (content === "wordnumber") {
       const ws = take(rng, WORD_POOL, k), ns = take(rng, "123456789".split(""), k);
       pairs = ws.map((w, j) => ({ cue: { key: w, html: txt(w, "huge") }, ans: { key: ns[j], html: txt(ns[j], "big") }, study: row(txt(w, "word"), txt(ns[j], "big")) }));
@@ -324,19 +330,18 @@ E.series = ({ tier, rng, content }) => ({
   trial(i, s) {
     const nOpt = at([3, 3, 3, 4, 4, 4], s);
     const showSeq = (arr) => `<div class="rowset">${arr.join("")}<span class="qmark">?</span></div>`;
-    if (content === "color" || content === "shape" || content === "shapecolor") {
+    if (content === "animals" || content === "tinted") {
       const units = at([["AB"], ["AB", "ABB"], ["AAB", "ABB"], ["ABC", "AABB"], ["ABC", "ABAC"], ["ABCB", "AABB", "ABAC"]], s);
       const unit = pick(rng, units), len = unit.length;
       const L = 2 * len + rint(rng, 0, len - 1);
       const letters = [...new Set(unit)];
       let tokens, render, allTokens;
-      if (content === "color") { const cs = take(rng, COLOR_NAMES, letters.length); tokens = Object.fromEntries(letters.map((l, j) => [l, cs[j]])); render = (c) => swatch(c, 52); allTokens = COLOR_NAMES; }
-      else if (content === "shape") { const ss = take(rng, shapePool(tier), letters.length); tokens = Object.fromEntries(letters.map((l, j) => [l, ss[j]])); render = (c) => shapeSvg(c, NEUTRAL, 52); allTokens = shapePool(tier); }
+      if (content === "animals") { const an = take(rng, ANIMALS, letters.length); tokens = Object.fromEntries(letters.map((l, j) => [l, an[j]])); render = (a) => pictureSvg(a, 56); allTokens = ANIMALS; }
       else {
-        const ss = take(rng, shapePool(tier), letters.length), cs = take(rng, COLOR_NAMES, letters.length);
-        tokens = Object.fromEntries(letters.map((l, j) => [l, `${ss[j]}|${cs[j]}`]));
-        render = (t) => { const [a, b] = t.split("|"); return shapeSvg(a, COLORS[b], 52); };
-        allTokens = shapePool(tier).flatMap((a) => COLOR_NAMES.map((b) => `${a}|${b}`));
+        const an = take(rng, ANIMALS, letters.length), cs = take(rng, COLOR_NAMES, letters.length);
+        tokens = Object.fromEntries(letters.map((l, j) => [l, `${an[j]}|${cs[j]}`]));
+        render = (t) => { const [a, b] = t.split("|"); return pictureSvg(a, 56, COLORS[b], t); };
+        allTokens = ANIMALS.flatMap((a) => COLOR_NAMES.map((b) => `${a}|${b}`));
       }
       const seq = Array.from({ length: L }, (_, j) => tokens[unit[j % len]]), next = tokens[unit[L % len]];
       const inUnit = Object.values(tokens).filter((t) => t !== next);
@@ -349,11 +354,6 @@ E.series = ({ tier, rng, content }) => ({
       const sign = up ? 1 : -1, seq = Array.from({ length: len }, (_, j) => start + sign * d * j), next = start + sign * d * len;
       const r = numOptions(rng, next, [next + d, next - d, next + 1, next - 1, next + 2 * d, next - 2 * d, next + 10, next + 2], 4, 0);
       return choice({ prompt: "Find the rule. What number comes next?", stimulus: showSeq(seq.map((n) => txt(String(n), "big"))), ...r, meta: { seq, d: sign * d } });
-    }
-    if (content === "letter") {
-      const k = at([1, 1, 2, 2, 3, 3], s), len = s <= 2 ? 4 : 5, start = rint(rng, 0, 25 - k * len);
-      const seq = Array.from({ length: len }, (_, j) => ALPHA[start + k * j]), idx = start + k * len;
-      return choice({ prompt: "Find the rule. Which letter comes next?", stimulus: showSeq(seq.map((n) => txt(n, "big"))), ...letterOptions(rng, idx, [k, -k], 4), meta: { seq, k, next: ALPHA[idx] } });
     }
     if (content === "numberalt") {
       const [da, db] = pick(rng, at([[[1, 10]], [[2, 10], [3, 5]], [[2, -3], [3, 5]], [[4, -2], [5, -3]], [[3, 7], [-2, 6]], [[-3, 8], [5, -4]]], s));
@@ -424,10 +424,10 @@ E.stroop = ({ rng, content }) => ({
 
 // ---- n-back (stateful stream)
 E.nback = ({ tier, rng, content }) => {
-  if (!["letter", "shape", "digit", "position"].includes(content)) throw new Error("nback: " + content);
+  if (!["animal", "letter", "digit", "position"].includes(content)) throw new Error("nback: " + content);
   const seq = [];
-  const fresh = () => (content === "letter" ? pick(rng, "BDGKPQTVZ".split("")) : content === "shape" ? pick(rng, TOT_SHAPES) : content === "digit" ? rint(rng, 1, 9) : rint(rng, 0, 8));
-  const show = (v) => (content === "letter" ? txt(v, "huge") : content === "digit" ? txt(String(v), "giant") : content === "shape" ? shapeSvg(v, NEUTRAL, 110) : patternSvg(Array.from({ length: 9 }, (_, j) => (j === v ? 1 : 0)), 3, 120));
+  const fresh = () => (content === "letter" ? pick(rng, "BDGKPQTVZ".split("")) : content === "animal" ? pick(rng, ANIMALS) : content === "digit" ? rint(rng, 1, 9) : rint(rng, 0, 8));
+  const show = (v) => (content === "letter" ? txt(v, "huge") : content === "digit" ? txt(String(v), "giant") : content === "animal" ? pictureSvg(v, 120) : patternSvg(Array.from({ length: 9 }, (_, j) => (j === v ? 1 : 0)), 3, 120));
   return {
     trial(i, s) {
       const n = tier === 2 && s >= 5 ? 2 : 1, preface = [];
@@ -441,16 +441,6 @@ E.nback = ({ tier, rng, content }) => {
     },
   };
 };
-
-// ---- category: which does not belong?
-E.category = ({ rng, content }) => ({
-  trial(i, s) {
-    const nOpt = at([3, 4, 4, 5, 5, 6], s);
-    const members = take(rng, WORD_LISTS[content], nOpt - 1), foil = pick(rng, FOILS[content]);
-    const o = (w) => ({ key: w, html: txt(w, "word") });
-    return choice({ prompt: CATEGORY_PROMPT[content], ...choose(rng, o(foil), members.map(o), nOpt), cols: nOpt > 4 ? 3 : 2 });
-  },
-});
 
 // ---- symbol code (key lookup)
 E.symbolcode = ({ tier, rng, content }) => {
@@ -540,15 +530,14 @@ E.switch = ({ tier, rng, content }) => {
     trial(i, s) {
       const cue = (i >> 1) % 2, changed = lastCue !== null && cue !== lastCue; lastCue = cue;
       const banner = changed ? "The rule has changed!" : "";
-      if (content === "colorshape") {
-        const sh = pick(rng, TOT_SHAPES), c = pick(rng, COLOR_NAMES);
-        const stim = shapeSvg(sh, COLORS[c], 96);
+      if (content === "animalcolor") {
+        const an = pick(rng, ANIMALS), c = pick(rng, COLOR_NAMES), stim = pictureSvg(an, 110, COLORS[c]);
         if (cue === 0) {
           const r = choose(rng, { key: c, html: swatch(c, 64) }, take(rng, COLOR_NAMES.filter((x) => x !== c), 2).map((n) => ({ key: n, html: swatch(n, 64) })), 3);
           return choice({ prompt: "Rule: tap its COLOUR.", banner, stimulus: stim, ...r, size: "lg" });
         }
-        const r = choose(rng, { key: sh, html: shapeSvg(sh, NEUTRAL, 64) }, take(rng, TOT_SHAPES.filter((x) => x !== sh), 2).map((n) => ({ key: n, html: shapeSvg(n, NEUTRAL, 64) })), 3);
-        return choice({ prompt: "Rule: tap its SHAPE.", banner, stimulus: stim, ...r, size: "lg" });
+        const r = choose(rng, { key: an, html: pictureSvg(an, 72) }, take(rng, ANIMALS.filter((x) => x !== an), 2).map((n) => ({ key: n, html: pictureSvg(n, 72) })), 3);
+        return choice({ prompt: "Rule: tap which ANIMAL it is.", banner, stimulus: stim, ...r, size: "lg" });
       }
       if (content === "parity") {
         const v = pick(rng, [1, 2, 3, 4, 6, 7, 8, 9]);
@@ -572,12 +561,11 @@ const PAD_TIME = [[1000, 950, 900, 850, 800, 750], [850, 800, 750, 700, 650, 600
 function buildSequence({ tier, rng, content }, centre) {
   const lens = centre
     ? { digits: [3, 3, 4, 4, 5, 6], revdigits: [3, 3, 3, 4, 4, 5], letters: [3, 3, 4, 4, 5, 5], revletters: [3, 3, 4, 4, 5, 5], letternumber: [3, 3, 4, 4, 5, 6] }[content]
-    : { colors: [2, 2, 3, 3, 3, 4], shapes: [2, 2, 3, 3, 3, 4], positions: [2, 2, 3, 3, 3, 4], letters: [3, 3, 4, 4, 5, 5], corsi: [3, 3, 4, 5, 5, 6], greek: [4, 4, 5, 5, 6, 7] }[content];
+    : { animals: [2, 2, 3, 3, 3, 4], fruits: [2, 2, 3, 3, 3, 4], positions: [2, 2, 3, 3, 3, 4], letters: [3, 3, 4, 4, 5, 5], corsi: [3, 3, 4, 5, 5, 6], greek: [4, 4, 5, 5, 6, 7] }[content];
   if (!lens) throw new Error((centre ? "span: " : "sequence: ") + content);
   const reverse = content === "revdigits" || content === "revletters", letterPad = take(rng, "BCDFGHJKLMNPRSTVWZ".split(""), 8);
   let pads;
-  if (!centre && content === "colors") pads = take(rng, COLOR_NAMES, 4).map((c) => ({ id: c, html: swatch(c, 78) }));
-  else if (!centre && content === "shapes") pads = take(rng, shapePool(tier), 4).map((c) => ({ id: c, html: shapeSvg(c, NEUTRAL, 70) }));
+  if (!centre && (content === "animals" || content === "fruits")) pads = take(rng, PICTURE_SETS[content], 4).map((c) => ({ id: c, html: pictureSvg(c, 74) }));
   else if (centre && (content === "digits" || content === "revdigits")) pads = "1234567890".split("").map((c) => ({ id: c, html: txt(c, "big") }));
   else if (content === "letters" || content === "revletters") pads = letterPad.map((c) => ({ id: c, html: txt(c, "big") }));
   else if (content === "letternumber") pads = [..."123456789".split(""), ...letterPad].map((c) => ({ id: c, html: txt(c, "big") }));
@@ -585,7 +573,7 @@ function buildSequence({ tier, rng, content }, centre) {
   else if (content === "corsi") pads = scatter(rng, 9, 4, 3).map((p, j) => ({ id: String(j), html: "", x: p.x, y: p.y }));
   return {
     trial(i, s) {
-      const layout = content === "positions" ? (s <= 4 ? "grid2" : "grid3") : content === "corsi" ? "scatter" : content === "letternumber" ? "grid6" : centre && (content === "digits" || content === "revdigits") ? "keypad" : content === "colors" || content === "shapes" ? "row" : "grid4";
+      const layout = content === "positions" ? (s <= 4 ? "grid2" : "grid3") : content === "corsi" ? "scatter" : content === "letternumber" ? "grid6" : centre && (content === "digits" || content === "revdigits") ? "keypad" : content === "animals" || content === "fruits" ? "row" : "grid4";
       let use = pads;
       if (content === "positions") { const n = s <= 4 ? 2 : 3; use = Array.from({ length: n * n }, (_, j) => ({ id: String(j), html: "" })); }
       const len = at(lens, s);
@@ -609,12 +597,16 @@ E.span = (ctx) => buildSequence(ctx, true);
 
 E.order = ({ tier, rng, content }) => ({
   trial(i, s) {
-    const nn = content === "countdown" ? at([4, 5, 5, 6, 7, 8], s) : content === "numbers" ? at([3, 3, 3, 4, 4, 5], s) : at([3, 3, 4, 4, 5, 5], s);
+    const nn = content === "countdown" ? at([4, 5, 5, 6, 7, 8], s) : content === "numbers" ? at([3, 3, 3, 4, 4, 5], s) : content === "trail" ? at([6, 6, 8, 8, 10, 10], s) : at([3, 3, 4, 4, 5, 5], s);
     const pos = scatter(rng, nn, 4, 3);
     let targets, expected, prompt;
     if (content === "numbers") { targets = Array.from({ length: nn }, (_, j) => ({ id: String(j + 1), html: txt(String(j + 1), "big"), cls: "bubble" })); expected = targets.map((t) => t.id); prompt = "Tap the numbers in order: 1, 2, 3 and on."; }
     else if (content === "countdown") { targets = Array.from({ length: nn }, (_, j) => ({ id: String(nn - j), html: txt(String(nn - j), "big"), cls: "bubble" })); expected = targets.map((t) => t.id); prompt = `Tap backwards: ${nn} down to 1.`; targets = shuffle(rng, targets); }
-    else if (content === "size") {
+    else if (content === "trail") {
+      // Trail Making B: 1, A, 2, B, 3, C ... switching between numbers and letters
+      targets = Array.from({ length: nn }, (_, j) => { const v = j % 2 === 0 ? String(j / 2 + 1) : "ABCDEFGH"[(j - 1) / 2]; return { id: v, html: txt(v, "big"), cls: j % 2 === 0 ? "bubble" : "bubble alt" }; });
+      expected = targets.map((t) => t.id); prompt = "Tap in order, switching: 1, A, 2, B, 3, C and on.";
+    } else if (content === "size") {
       const col = COLORS[pick(rng, COLOR_NAMES)];
       targets = Array.from({ length: nn }, (_, j) => ({ id: String(j), html: shapeSvg("circle", col, 34 + j * 16), cls: "free" }));
       expected = targets.map((t) => t.id); prompt = "Tap the circles from the SMALLEST to the BIGGEST.";
@@ -628,10 +620,13 @@ E.order = ({ tier, rng, content }) => ({
 E.search = ({ tier, rng, content }) => ({
   trial(i, s) {
     const T = at([[2, 2, 3, 3, 3, 4], [3, 3, 4, 4, 5, 5], [3, 4, 4, 5, 5, 6]][tier], s), D = at([[3, 4, 5, 6, 7, 8], [8, 10, 12, 14, 16, 18], [10, 12, 14, 16, 18, 20]][tier], s);
-    const total = Math.min(20, T + D), dn = total - T;
+    const total = Math.min(20, T + D), dn = total - T, px = tier === 0 ? 60 : 46;
     let target, distract, prompt;
-    if (content === "shapes") { target = () => shapeSvg("star", COLORS.orange, 40); distract = () => shapeSvg(pick(rng, ["circle", "square", "triangle"]), COLORS.blue, 40); prompt = "Tap every star."; }
-    else if (content === "conjunction") { target = () => shapeSvg("star", COLORS.red, 40); distract = () => (rng() < 0.5 ? shapeSvg("circle", COLORS.red, 40) : shapeSvg("star", COLORS.blue, 40)); prompt = "Tap every RED star."; }
+    if (content === "fruits") {
+      const far = s <= 2 ? [...THINGS, ...VEHICLES] : s <= 4 ? FRUITS.filter((f) => f !== "apple") : ["strawberry", "cherries", "pear", "banana", "carrot"];
+      target = () => pictureSvg("apple", px); distract = () => pictureSvg(pick(rng, far), px); prompt = "Tap every apple.";
+    }
+    else if (content === "conjunction") { target = () => pictureSvg("fish", px, COLORS.red); distract = () => (rng() < 0.5 ? pictureSvg("bird", px, COLORS.red) : pictureSvg("fish", px, COLORS.blue)); prompt = "Tap every RED fish. Not the blue fish, not the red birds."; }
     else if (content === "letters") { const pool = (s <= 2 ? "AMTLKWNS" : "DPREFHK").split(""); target = () => txt("B", "big"); distract = () => txt(pick(rng, pool), "big"); prompt = "Tap every letter B."; }
     else if (content === "digits") { const pool = (s <= 2 ? "134689" : "1234569").split(""); target = () => txt("7", "big"); distract = () => txt(pick(rng, pool), "big"); prompt = "Tap every number 7."; }
     else if (content === "lookalike") { const pool = (s <= 2 ? "mnartek" : "dpqdpqh").split(""); target = () => txt("b", "big"); distract = () => txt(pick(rng, pool), "big"); prompt = "Tap every lowercase b. Beware of letters that look like it."; }
@@ -646,29 +641,30 @@ const PERIOD = [[3600, 3300, 3000, 2700, 2400, 2100], [3000, 2700, 2400, 2100, 1
 E.timing = ({ tier, rng, content }) => ({
   trial(i, s) {
     const w = at([0.34, 0.3, 0.26, 0.22, 0.18, 0.15], s), c = 0.25 + rng() * 0.5;
-    return { kind: "timing", prompt: content === "dot" ? "Tap to stop the dot inside the green zone." : "Tap to stop the bus on the green stop.", zone: [c - w / 2, c + w / 2], periodMs: at(PERIOD[tier], s), maxPasses: 3 };
+    return { kind: "timing", prompt: content === "dot" ? "Tap to stop the dot inside the green zone." : "Tap to stop the bus on the green stop.", zone: [c - w / 2, c + w / 2], periodMs: at(PERIOD[tier], s), maxPasses: 3, icon: content === "dot" ? null : pictureSvg("bus", 40) };
   },
 });
 
 E.gonogo = ({ tier, rng, content }) => {
   const blocks = [];       // every block of 3 rounds holds exactly one no-go
   const WIN = [[3500, 3200, 2900, 2600, 2300, 2000], [1800, 1600, 1400, 1200, 1000, 850], [1600, 1400, 1200, 1000, 850, 700]][tier];
-  const stim = (go) => {
-    if (content === "color") return { go, html: `<span class="sw round" style="background:${go ? COLORS.green : COLORS.red};width:120px;height:120px"></span>`, label: go ? "green" : "red" };
-    if (content === "shape") { const sh = go ? "circle" : pick(rng, ["square", "triangle", "star", "diamond"]); return { go, html: shapeSvg(sh, COLORS.blue, 120), label: sh }; }
+  const tint = () => COLORS[pick(rng, COLOR_NAMES)];
+  const stim = (go, s) => {
+    if (content === "animals") { const a = go ? "cat" : pick(rng, s <= 2 ? ["dog"] : ANIMALS.filter((x) => x !== "cat")); return { go, html: pictureSvg(a, 130, tint()), label: a }; }
+    if (content === "vehicles") { const v = go ? "bus" : pick(rng, s <= 2 ? ["car"] : VEHICLES.filter((x) => x !== "bus")); return { go, html: pictureSvg(v, 130, tint()), label: v }; }
     if (content === "letter") { const L = go ? pick(rng, "ABCDEFGHJKLMNPQRSTUVWYZ".split("")) : "X"; return { go, html: txt(L, "giant"), label: L }; }
     if (content === "digit") { const d = go ? pick(rng, [0, 2, 4, 6, 8]) : pick(rng, [1, 3, 5, 7, 9]); return { go, html: txt(String(d), "giant"), label: String(d) }; }
     if (content === "wordcategory") { const w = go ? pick(rng, WORD_LISTS.animals) : pick(rng, [...FOILS.animals, ...WORD_LISTS.food]); return { go, html: txt(w, "huge"), label: w }; }
     throw new Error("gonogo: " + content);
   };
-  const prompts = { color: "Tap when it is GREEN. Wait when it is red.", shape: "Tap the CIRCLES only.", letter: "Tap every letter, but NOT the X.", digit: "Tap EVEN numbers only.", wordcategory: "Tap ANIMAL words only." };
+  const prompts = { animals: "Tap the CAT. Wait for any other animal.", vehicles: "Tap the BUS. Wait for the other vehicles.", letter: "Tap every letter, but NOT the X.", digit: "Tap EVEN numbers only.", wordcategory: "Tap ANIMAL words only." };
   return {
     rounds: { session: 12 },
     trial(i, s) {
       const b = Math.floor(i / 3);
       if (!blocks[b]) blocks[b] = shuffle(rng, [true, true, false]);
       const go = blocks[b][i % 3];
-      return { kind: "gonogo", prompt: prompts[content], stim: stim(go), windowMs: at(WIN, s), waitMs: rint(rng, 500, 1100) };
+      return { kind: "gonogo", prompt: prompts[content], stim: stim(go, s), windowMs: at(WIN, s), waitMs: rint(rng, 500, 1100) };
     },
   };
 };
@@ -678,8 +674,7 @@ E.pairs = ({ tier, rng, content }) => ({
   trial(i, s) {
     const n = ramp(tier, s, [2, 3, 4], [3, 6, 8]);
     let defs;
-    if (content === "shapes") defs = take(rng, shapePool(tier), n).map((sh) => [shapeSvg(sh, NEUTRAL, 54), shapeSvg(sh, NEUTRAL, 54)]);
-    else if (content === "colors") defs = take(rng, COLOR_NAMES, n).map((c) => [swatch(c, 54), swatch(c, 54)]);
+    if (content === "pictures" || content === "animals") defs = take(rng, PICTURE_SETS[content], n).map((p) => [pictureSvg(p, 56), pictureSvg(p, 56)]);
     else if (content === "numbers") defs = take(rng, [1, 2, 3, 4, 5], n).map((d) => [txt(String(d), "big"), dotsHtml(d, COLORS.orange, 3, 12)]);
     else if (content === "words") defs = take(rng, OPPOSITES, n).map(([a, b]) => [txt(a, "word"), txt(b, "word")]);
     else if (content === "symbols") defs = take(rng, GREEK, n).map((g) => [txt(g, "big"), txt(g, "big")]);
@@ -696,11 +691,13 @@ E.grid = ({ rng }) => ({
   },
 });
 
-E.reaction = ({ tier, rng }) => ({
+E.reaction = ({ tier, rng, content }) => ({
   trial(i, s) {
-    return { kind: "reaction", prompt: "Wait for the star, then tap it!", html: shapeSvg("star", COLORS.orange, 130), waitMs: rint(rng, 900, 2200), limitMs: at([4000, 3600, 3200, 2800, 2400, 2000], s) };
+    if (content !== "butterfly") throw new Error("reaction: " + content);
+    return { kind: "reaction", prompt: "Wait for the butterfly, then tap it!", html: pictureSvg("butterfly", 130, COLORS.orange), waitMs: rint(rng, 900, 2200), limitMs: at([4000, 3600, 3200, 2800, 2400, 2000], s) };
   },
 });
+
 
 // -------------------------------------------------------------------- public
 export function makeGame(game, rng = Math.random) {

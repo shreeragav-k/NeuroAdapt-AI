@@ -2,11 +2,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { CATALOG, GROUPS, LEVELS, RULES, WORD_LISTS, FOILS, DOMAINS, domainOf, STORIES, ANALOGIES } from "../web/js/flow/data.js";
+import { CATALOG, GROUPS, LEVELS, RULES, WORD_LISTS, FOILS, DOMAINS, domainOf, STORIES, ANALOGIES, TASK_INFO } from "../web/js/flow/data.js";
 import * as Cloud from "../web/js/flow/cloud.js";
 import { createAccount, signInAccount } from "../web/js/flow/auth.js";
 import { reportHtml } from "../web/js/flow/report.js";
 import { makeGame, ENGINE_NAMES, _transforms, COLORS } from "../web/js/flow/engines.js";
+import { pictureSvg, ALL_PICTURES } from "../web/js/flow/art.js";
 import * as L from "../web/js/flow/logic.js";
 
 const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -184,20 +185,25 @@ const hexToColour = Object.fromEntries(Object.entries(COLORS).map(([k, v]) => [v
 // every thing drawn in a piece of html, as a comparable key ("star|red", "dog", "7", ...)
 const tokensOf = (h) => [...h.matchAll(/aria-label="([^"]+)"[^>]*><g fill="([^"]+)"|aria-label="([^"]+)"|class="tx[^"]*">([^<]+)/g)].map((m) => (m[1] ? (hexToColour[m[2]] ? `${m[1]}|${hexToColour[m[2]]}` : m[1]) : m[3] || m[4]));
 
+// every item drawn in a piece of html: pictures by their data-key ("cat", "cat|red"), words / letters by text
+const picKeys = (h) => [...h.matchAll(/data-key="([^"]+)"|class="tx[^"]*">([^<]+)/g)].map((m) => m[1] || m[2]);
+
 test("answers: serial subtraction continues the same step", () => {
   for (const d of sampleGames("arith", "serial")) { const t = d.meta.expr.split(", ").slice(0, 3).map(Number); assert.equal(t[0] - t[1], t[1] - t[2]); assert.equal(Number(right(d)), t[2] - (t[0] - t[1])); assert.ok(Number(right(d)) > 0); }
 });
 
-test("answers: number and letter series", () => {
+test("answers: number series", () => {
   for (const d of sampleGames("series", "number")) assert.equal(Number(right(d)), d.meta.seq[d.meta.seq.length - 1] + d.meta.d);
   for (const d of sampleGames("series", "numberalt")) { const q = d.meta.seq, n = q.length; assert.equal(Number(right(d)), q[n - 2] + (q[n - 2] - q[n - 4])); }
-  for (const d of sampleGames("series", "letter")) assert.equal(right(d), d.meta.next);
 });
 
-test("answers: colour / shape pattern series continue the unit", () => {
-  for (const c of ["color", "shape", "shapecolor"]) for (const d of sampleGames("series", c)) {
-    const { unit, L: len } = d.meta, shown = (d.stimulus.match(/<(?:span class="sw"|svg class="sh")[^>]*>/g) || []).length;
-    assert.equal(shown, len, c);
+test("answers: picture pattern series continue the unit", () => {
+  for (const c of ["animals", "tinted"]) for (const d of sampleGames("series", c)) {
+    const { unit, L: len } = d.meta, keys = picKeys(d.stimulus);
+    assert.equal(keys.length, len, c);
+    // the pictures repeat with the unit, so the one that follows the shown ones is fixed by the unit
+    const symbol = {}; keys.forEach((k, j) => { const u = unit[j % unit.length]; if (symbol[u] === undefined) symbol[u] = k; assert.equal(symbol[u], k, "pattern broken at " + j); });
+    assert.equal(right(d), symbol[unit[len % unit.length]]);
     assert.ok(d.options.length >= 3);
   }
 });
@@ -247,7 +253,7 @@ test("answers: in every odd-one-out grid exactly one cell differs, and it is the
     const inst = makeGame(g, mulberry(21));
     for (let i = 0; i < 60; i++) {
       const d = inst.trial(i, STEPS[i % 6]);
-      const sig = d.options.map((o) => (g.content === "shape" ? o.html.replace(/fill="[^"]*"/g, "") : o.html));
+      const sig = d.options.map((o) => (g.content === "animals" || g.content === "things" ? (o.html.match(/data-key="([^"]+)"/) || [])[1] : o.html));
       const groups = new Map(); sig.forEach((s, j) => groups.set(s, [...(groups.get(s) || []), j]));
       assert.equal(groups.size, 2, `${g.id} step ${STEPS[i % 6]}: cells should come in exactly two kinds`);
       const single = [...groups.values()].filter((v) => v.length === 1);
@@ -262,7 +268,7 @@ test("memory: recognition (recall, delayed recall) offers exactly one item that 
   for (const g of CATALOG.filter((x) => (x.engine === "recall" || x.engine === "delayed") && x.mode !== "missing" && x.content !== "positions")) {
     const inst = makeGame(g, mulberry(4));
     for (let i = 0; i < 40; i++) {
-      const d = inst.trial(i, STEPS[i % 6]), shown = tokensOf(d.stimulus);
+      const d = inst.trial(i, STEPS[i % 6]), shown = picKeys(d.stimulus);
       assert.ok(shown.length >= 1, g.id);
       d.options.forEach((o, j) => assert.equal(shown.includes(o.key), j === d.answer, `${g.id}: only the answer was shown (${o.key} vs ${shown})`));
       if (g.engine === "delayed") { assert.ok(d.delayMs >= 1500 && d.delayText && d.showMs > 0, g.id); }
@@ -275,8 +281,20 @@ test("memory: 'missing' recall asks about the one item that disappeared", () => 
   for (const g of CATALOG.filter((x) => x.engine === "recall" && x.mode === "missing")) {
     const inst = makeGame(g, mulberry(8));
     for (let i = 0; i < 30; i++) {
-      const d = inst.trial(i, STEPS[i % 6]), a = tokensOf(d.stimulus), b = tokensOf(d.after);
+      const d = inst.trial(i, STEPS[i % 6]), a = picKeys(d.stimulus), b = picKeys(d.after);
       assert.equal(a.length - 1, b.length); assert.deepEqual(a.filter((x) => !b.includes(x)), [right(d)]);
+    }
+  }
+});
+
+test("memory: the basket asks for ALL the items that were shown, among as many that were not", () => {
+  for (const g of CATALOG.filter((x) => x.engine === "basket")) {
+    const inst = makeGame(g, mulberry(14));
+    for (let i = 0; i < 40; i++) {
+      const d = inst.trial(i, STEPS[i % 6]), shown = picKeys(d.stimulus);
+      assert.ok(d.multi && Array.isArray(d.answers)); assert.equal(d.answers.length, shown.length); assert.equal(d.options.length, shown.length * 2);
+      d.options.forEach((o, j) => assert.equal(d.answers.includes(j), shown.includes(o.key), `${g.id}: option ${o.key}`));
+      assert.equal(new Set(shown).size, shown.length); assert.ok(d.showMs > 0);
     }
   }
 });
@@ -378,6 +396,63 @@ test("reasoning: matrix pieces follow the rule and only one piece fits", () => {
     const { n, P, mr, mc } = d.meta; assert.equal(right(d), patKey(rot(P[mr], n, mc)));
     assert.equal(d.options.filter((o) => o.key === patKey(rot(P[mr], n, mc))).length, 1);
   }
+});
+
+test("attention: trail making switches between numbers and letters", () => {
+  for (const d of sampleGames("order", "trail", 40)) {
+    d.expected.forEach((id, j) => assert.ok(j % 2 === 0 ? /^\d+$/.test(id) : /^[A-Z]$/.test(id), id));
+    const nums = d.expected.filter((x) => /\d/.test(x)).map(Number), letters = d.expected.filter((x) => /[A-Z]/.test(x));
+    assert.deepEqual(nums, nums.map((_, j) => j + 1)); assert.deepEqual(letters, letters.map((_, j) => "ABCDEFGH"[j]));
+  }
+});
+
+test("attention: picture search hides the targets among look-alikes of the same kind of picture", () => {
+  for (const d of sampleGames("search", "fruits", 30)) assert.ok(d.targets.filter((t) => d.expected.includes(t.id)).every((t) => t.html.includes('data-key="apple"')));
+  for (const d of sampleGames("search", "conjunction", 30)) {
+    const t = d.targets.filter((x) => d.expected.includes(x.id)), nt = d.targets.filter((x) => !d.expected.includes(x.id));
+    assert.ok(t.every((x) => x.html.includes('aria-label="fish"') && x.html.includes(COLORS.red)));
+    assert.ok(nt.every((x) => !(x.html.includes('aria-label="fish"') && x.html.includes(COLORS.red))));
+  }
+});
+
+test("pictures: 26 distinct drawings, each can take any body colour", () => {
+  assert.equal(ALL_PICTURES.length, 26); assert.equal(new Set(ALL_PICTURES).size, 26);
+  const seen = new Set();
+  for (const n of ALL_PICTURES) {
+    const a = pictureSvg(n, 64), b = pictureSvg(n, 64, COLORS.blue, n + "|blue");
+    assert.match(a, /^<svg class="pic"/); assert.ok(a.includes(`aria-label="${n}"`) && a.includes(`data-key="${n}"`)); assert.ok(b.includes('data-key="' + n + '|blue"')); assert.notEqual(a, b);
+    seen.add(a.replace(/data-key="[^"]*"/, "").replace(/aria-label="[^"]*"/, ""));
+  }
+  assert.equal(seen.size, 26, "no two drawings are the same");
+  assert.throws(() => pictureSvg("dragon"));
+});
+
+test("difficulty order: every set runs from the gentlest game to the most demanding", () => {
+  for (const g of GROUPS) for (const phase of ["test", ...LEVELS]) {
+    const set = CATALOG.filter((x) => x.group === g.id && x.phase === phase);
+    assert.deepEqual(set.map((x) => x.difficulty), set.map((_, i) => i + 1), `${g.id}/${phase} ranks must be 1..${set.length} in order`);
+    set.forEach((x, i) => assert.equal(x.order, i));
+  }
+  // the players meet the games in that order
+  const p = login("Ord", 33); const seen = [];
+  while (L.stageOf(p) === "test") { const gm = L.expectedTestGame(p); seen.push(gm.difficulty); L.recordTestGame(p, gm.id, Array.from({ length: 6 }, () => ({ step: 3, correct: true, rt: 1 })), "d"); }
+  assert.deepEqual(seen, [1, 2, 3, 4, 5]);
+});
+
+test("every game names its classic cognitive task and what it trains", () => {
+  for (const g of CATALOG) { assert.ok(g.task && g.trains, g.id); assert.ok(TASK_INFO[g.engine], g.engine); }
+  assert.deepEqual(Object.keys(TASK_INFO).sort(), [...new Set(CATALOG.map((g) => g.engine))].sort(), "no unused or missing task descriptions");
+});
+
+test("suggestions: the focus areas are the lowest skill areas of the latest report", () => {
+  const p = login("Foc", 12); playTest(p, ALT); L.markAssessmentViewed(p);
+  const f0 = L.focusAreas(p), a = p.reports[0].domains;
+  assert.ok(f0.length <= 2); f0.forEach((f) => assert.equal(f.score, a[f.area])); assert.deepEqual(f0.map((f) => f.score), [...f0.map((f) => f.score)].sort((x, y) => x - y));
+  assert.ok(Object.entries(a).filter(([k]) => !f0.some((f) => f.area === k)).every(([, v]) => v >= Math.max(...f0.map((f) => f.score))));
+  const d = playSession(p, 1, "2026-10-01");
+  assert.deepEqual(L.focusAreas(p), [], "a perfect day leaves nothing to focus on");
+  playSession(p, 0.5, "2026-10-02");
+  assert.ok(L.focusAreas(p).every((f) => f.score === 50));
 });
 
 // ================================================================ the workflow

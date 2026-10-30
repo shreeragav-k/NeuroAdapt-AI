@@ -121,6 +121,14 @@ export function domainScores(rows) {
   return Object.fromEntries(DOMAINS.filter((d) => by[d]).map((d) => [d, Math.round(mean(by[d]))]));
 }
 
+// The skill areas to build next: the lowest scores in the latest report (the assessment until a daily report exists).
+export function focusAreas(p, n = 2) {
+  const daily = [...p.reports].reverse().find((r) => r.type === "daily");
+  const assessment = p.reports.find((r) => r.id === "assessment");
+  const scores = daily ? Object.fromEntries((daily.skills || []).filter((k) => k.today != null).map((k) => [k.area, k.today])) : (assessment && assessment.domains) || {};
+  return Object.entries(scores).filter(([, v]) => v < RULES.promoteAt).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).slice(0, n).map(([area, score]) => ({ area, score }));
+}
+
 // --------------------------------------------------------------- the profile
 // One profile per account. `id` is the account id (Firebase uid, or a local id).
 export function newProfile({ name, age, group, condition, email = "" }, id, now = new Date().toISOString()) {

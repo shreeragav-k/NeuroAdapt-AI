@@ -5,9 +5,10 @@
 // A player can only be on the screen that matches their stage; anything else
 // redirects (see `allowed`).
 import * as S from "./flow/storage.js";
-import { GROUPS, LEVEL_LABEL, RULES } from "./flow/data.js";
+import { GROUPS, LEVEL_LABEL, RULES, domainOf } from "./flow/data.js";
+import * as Sound from "./flow/sound.js";
 import * as L from "./flow/logic.js";
-import { playGame } from "./flow/play.js";
+import { playGame, shapeSvg } from "./flow/play.js";
 import * as Cloud from "./flow/cloud.js";
 import { createAccount, signInAccount } from "./flow/auth.js";
 import { reportHtml, reportTitle, reportSummary, esc } from "./flow/report.js";
@@ -28,8 +29,9 @@ function renderNav(p, stage) {
   $nav.innerHTML = `<div class="wrap">
     <a class="brand" ${p ? 'href="#/"' : ""} aria-label="Halcyon">Halcyon <i>play studio</i></a>
     <nav aria-label="Main">${links}</nav>
-    <div style="display:flex;align-items:center;gap:1rem">${p ? `${Cloud.enabled ? `<span class="muted small" id="cloudstat" role="status"></span>` : ""}<span class="who">${esc(p.name)} · ${esc(groupOf(p).label)}</span><button class="btn small quiet" id="signout" type="button">Sign out</button>` : ""}</div></div>`;
+    <div style="display:flex;align-items:center;gap:1rem">${p ? `<button class="btn small quiet" id="mute" type="button" aria-pressed="${!Sound.isMuted()}">${Sound.isMuted() ? "Sound off" : "Sound on"}</button>${Cloud.enabled ? `<span class="muted small" id="cloudstat" role="status"></span>` : ""}<span class="who">${esc(p.name)} · ${esc(groupOf(p).label)}</span><button class="btn small quiet" id="signout" type="button">Sign out</button>` : ""}</div></div>`;
   const so = $("#signout"); if (so) so.onclick = async () => { await Cloud.signOut(); S.signOut(); mode = "signin"; nav("#/login"); };
+  const mu = $("#mute"); if (mu) mu.onclick = () => { Sound.setMuted(!Sound.isMuted()); mu.textContent = Sound.isMuted() ? "Sound off" : "Sound on"; mu.setAttribute("aria-pressed", !Sound.isMuted()); };
   paintCloud();
 }
 $foot.innerHTML = `<div class="wrap"><p class="legal" style="margin-top:0;border-top:0;padding-top:0">Halcyon is a prototype for engagement and practice. Reports describe performance in these games only. They are not a medical assessment and make no diagnosis. Everything stays in this browser.</p></div>`;
@@ -106,6 +108,10 @@ function viewLogin() {
   };
 }
 
+const slug = (skill) => (domainOf(skill) || "other").toLowerCase().replace(/[^a-z]+/g, "-");
+const diffDots = (n, of) => `<span class="dots" aria-label="difficulty ${n} of ${of}">${Array.from({ length: of }, (_, k) => `<i class="${k < n ? "on" : ""}"></i>`).join("")}</span>`;
+const longestRun = (trials) => { let best = 0, run = 0; for (const t of trials) { run = t.correct ? run + 1 : 0; best = Math.max(best, run); } return best; };
+
 // ---------------------------------------------------- generic "play a set"
 // Plays `games` one after another from `cfg.index()`; records each with `cfg.record`.
 function runSet(p, cfg) {
@@ -113,16 +119,23 @@ function runSet(p, cfg) {
   const step = () => {
     const i = cfg.index(), g = games[i];
     L.assertInGroup(g, p.groupId);
-    setMain(`<div class="page"><div class="wrap narrow reveal">
+    const area = domainOf(g.skill);
+    setMain(`<div class="page"><div class="wrap narrow reveal taskcard area-${slug(g.skill)}">
       <div class="eyebrow">${esc(cfg.label)} · Game ${i + 1} of ${games.length}</div>
       <h1>${esc(g.title)}</h1><p class="lede">${esc(g.how)}</p>
-      <p class="muted small">Skill: ${esc(g.skill)}${tier === 0 ? ". A grown-up can read the instructions aloud and help with tapping." : ""}</p>
+      <dl class="task">
+        <div><dt>Cognitive skill</dt><dd><span class="areachip">${esc(area)}</span> ${esc(g.skill)}</dd></div>
+        <div><dt>Classic task</dt><dd>${esc(g.task)}</dd></div>
+        <div><dt>What it trains</dt><dd>${esc(g.trains)}</dd></div>
+        <div><dt>Difficulty</dt><dd>${diffDots(g.difficulty, games.length)} <span class="muted small">game ${g.difficulty} of ${games.length}, easiest to hardest</span></dd></div>
+      </dl>
+      ${tier === 0 ? `<p class="muted small">A grown-up can read the instructions aloud and help with tapping.</p>` : ""}
       <div class="steps" aria-hidden="true">${games.map((_, k) => `<i class="${k < i ? "on" : ""}"></i>`).join("")}</div>
       <button class="btn" id="go" type="button">Start game</button></div></div>`);
     $("#go").onclick = () => play(i, g);
   };
   const play = (i, g) => {
-    setMain(`<div class="page"><div class="wrap narrow"><div class="eyebrow">${esc(cfg.label)} · Game ${i + 1} of ${games.length}</div><h1 class="game-title">${esc(g.title)}</h1><div id="host"></div></div></div>`);
+    setMain(`<div class="page"><div class="wrap narrow play-wrap area-${slug(g.skill)}"><div class="eyebrow">${esc(cfg.label)} · Game ${i + 1} of ${games.length} · ${esc(domainOf(g.skill))}</div><h1 class="game-title">${esc(g.title)}</h1><div id="host"></div></div></div>`);
     const handle = playGame({
       host: $("#host"), game: g, tier, rounds: { isTest: cfg.isTest, defaults: { test: RULES.testRounds, session: RULES.sessionRounds } },
       stepFor: cfg.stepFor,
@@ -136,11 +149,15 @@ function runSet(p, cfg) {
     stopGame = handle.stop;
   };
   const finished = (i, g, trials, report) => {
-    const last = i + 1 === games.length, acc = L.pct(trials.filter((t) => t.correct).length, trials.length);
+    const last = i + 1 === games.length, right = trials.filter((t) => t.correct).length, acc = L.pct(right, trials.length);
+    const stars = acc >= 85 ? 3 : acc >= 60 ? 2 : 1;
     setMain(`<div class="page"><div class="wrap narrow reveal">
       <div class="eyebrow">${esc(cfg.label)} · Game ${i + 1} of ${games.length} complete</div>
       <h1>${esc(g.title)}</h1>
-      ${cfg.showScore ? `<p class="lede">You got ${trials.filter((t) => t.correct).length} of ${trials.length} right (${acc}%).</p>` : `<p class="lede">Well done. That game is finished.</p>`}
+      ${cfg.showScore
+        ? `<div class="stars" role="img" aria-label="${stars} of 3 stars">${[1, 2, 3].map((n) => shapeSvg("star", n <= stars ? "#e8b923" : "#d9d0bd", 52)).join("")}</div>
+           <p class="lede">You got ${right} of ${trials.length} right (${acc}%).${longestRun(trials) >= 3 ? ` Longest run: ${longestRun(trials)} in a row.` : ""}</p>`
+        : `<p class="lede">Well done. That game is finished.</p>`}
       <div class="steps" aria-hidden="true">${games.map((_, k) => `<i class="${k <= i ? "on" : ""}"></i>`).join("")}</div>
       <button class="btn" id="nx" type="button">${last ? "See the report" : "Next game"}</button></div></div>`);
     $("#nx").onclick = () => (last ? nav(cfg.afterLast(report)) : step());
@@ -161,8 +178,8 @@ function viewTest(p) {
   if (done > 0) return begin();
   setMain(`<div class="page"><div class="wrap narrow reveal">
     <div class="eyebrow">Step 1 · Assessment</div><h1>Hello, ${esc(p.name)}.</h1>
-    <p class="lede">First, five short games for ${esc(groupOf(p).label.toLowerCase())}. They start in the middle and get a little easier or harder depending on how you do, so there is nothing to pass or fail. Afterwards you will get a report and a plan.</p>
-    <ol class="plan">${games.map((g) => `<li><b>${esc(g.title)}</b><span>${esc(g.skill)}</span></li>`).join("")}</ol>
+    <p class="lede">First, five short games for ${esc(groupOf(p).label.toLowerCase())}, from the easiest to the most demanding. Each one starts in the middle and gets a little easier or harder depending on how you do, so there is nothing to pass or fail. Afterwards you will get a report and a plan.</p>
+    <ol class="plan">${games.map((g) => `<li><b>${esc(g.title)}</b><span>${esc(g.skill)} · ${esc(g.task)}</span></li>`).join("")}</ol>
     <button class="btn" id="b" type="button">Begin the assessment</button></div></div>`);
   $("#b").onclick = begin;
 }
@@ -180,17 +197,19 @@ function viewPlan(p) {
   const games = L.levelGames(p.groupId, level), doneIds = new Set(p.current ? p.current.done.map((d) => d.gameId) : []);
   const day = p.sessions.length + (p.current || st === "ready" ? 1 : 0);
   const last = p.sessions[p.sessions.length - 1];
+  const focus = L.focusAreas(p), focusSet = new Set(focus.map((f) => f.area));
   const action = st === "ready" ? `<button class="btn" id="start" type="button">Start today's session (Day ${day})</button>`
     : st === "resume" ? `<button class="btn" id="start" type="button">Resume today's session (game ${p.current.done.length + 1} of ${games.length})</button>`
     : `<div class="callout">Today's session is complete. The next one opens tomorrow, with the ${LEVEL_LABEL[p.level]} games.</div>
        <p class="small muted" style="margin-top:1rem">Testing aid: <button class="linkbtn" id="skip" type="button">pretend it is tomorrow</button></p>`;
   setMain(`<div class="page"><div class="wrap">
     <header><div class="eyebrow">Adaptive learning</div><h1>${esc(p.name)}, your plan.</h1>
-    <p class="lede">Current level: <b>${LEVEL_LABEL[level]}</b>. One session a day, made of these ${games.length} games. After each day a report compares your accuracy with earlier days and decides whether the level stays or changes.</p></header>
+    <p class="lede">Current level: <b>${LEVEL_LABEL[level]}</b>. One session a day, made of these ${games.length} games. The games run from a gentle warm-up to the most demanding, and the ones for your weakest skills are marked. After each day a report compares your accuracy with earlier days and decides whether the level stays or changes.</p></header>
     <div class="two"><section class="panel"><h3 style="font-size:1.7rem;margin-bottom:1rem">The ${LEVEL_LABEL[level]} games</h3>
-      <ol class="plan">${games.map((g) => `<li class="${doneIds.has(g.id) ? "done" : ""}"><b>${esc(g.title)}</b><span>${esc(g.skill)}${doneIds.has(g.id) ? " · done today" : ""}</span></li>`).join("")}</ol></section>
+      <ol class="plan">${games.map((g) => `<li class="${doneIds.has(g.id) ? "done" : ""}"><b>${esc(g.title)}${focusSet.has(domainOf(g.skill)) ? ` <em class="tag focus">focus</em>` : ""}</b><span>${esc(g.skill)} · ${esc(g.task)}${doneIds.has(g.id) ? " · done today" : ""}</span></li>`).join("")}</ol></section>
     <section class="panel" style="align-self:start"><h3 style="font-size:1.7rem;margin-bottom:1rem">Today</h3>
-      <p class="muted">${last ? `Last session: Day ${last.n}, ${LEVEL_LABEL[last.level]}, ${last.accuracy}%.` : "No sessions yet. This will be Day 1."}</p>${action}
+      <p class="muted">${last ? `Last session: Day ${last.n}, ${LEVEL_LABEL[last.level]}, ${last.accuracy}%.` : "No sessions yet. This will be Day 1."}</p>
+      ${focus.length ? `<div class="callout" style="margin-bottom:1.2rem"><b>Skills to build</b><br>${focus.map((f) => `${esc(f.area)}: ${f.score}%`).join(" · ")}<br><span class="small">These are your lowest skill areas so far. Their games are marked "focus".</span></div>` : ""}${action}
       ${p.sessions.length ? `<p style="margin-top:1.4rem"><a href="#/reports">All reports</a></p>` : ""}</section></div></div></div>`);
   const b = $("#start"); if (b) b.onclick = () => nav("#/session");
   const k = $("#skip"); if (k) k.onclick = () => { S.skipToNextDay(); route(); };

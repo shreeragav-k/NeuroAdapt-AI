@@ -56,6 +56,12 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*a, directory=str(WEB), **k)
 
     # --- helpers
+    def end_headers(self) -> None:
+        # make the browser re-check files, so an updated game is never hidden behind an old cached copy
+        if not any(b"Cache-Control" in h for h in getattr(self, "_headers_buffer", [])):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def _json(self, payload, code: int = 200) -> None:
         body = json.dumps(payload).encode()
         self.send_response(code)
