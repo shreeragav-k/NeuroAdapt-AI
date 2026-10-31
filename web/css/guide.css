@@ -1,0 +1,28 @@
+/* Halo, the 3D guide character. guide.js moves .halo3d with a transform; this file only styles it. */
+.halo3d { position: fixed; left: 0; top: 0; width: 150px; height: 190px; z-index: 60; pointer-events: none; will-change: transform; }
+.halo3d[hidden] { display: none; }
+.halo3d-hit { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto; border-radius: 40%; }
+.halo3d-hit:focus-visible { outline: 3px dashed #ffc83d; outline-offset: 2px; }
+.halo3d-canvas { position: absolute; inset: 0; display: block; }
+.halo3d-canvas canvas { width: 150px; height: 190px; display: block; }
+.halo3d-shadow { position: absolute; left: 50%; bottom: 2px; width: 70px; height: 12px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(0, 0, 0, .28), transparent 70%); pointer-events: none; }
+.halo3d-flat { position: absolute; left: 27px; bottom: 6px; animation: halo-float 3.2s ease-in-out infinite; }
+.halo3d-flat.walk { animation-duration: .35s; }
+
+.halo3d-bubble { position: absolute; left: 0; top: 0; width: max-content; max-width: min(88vw, 22rem); background: #fff; border: 3px solid var(--teal-deep); border-radius: 20px 20px 20px 6px; padding: .8rem 1rem .6rem; box-shadow: 0 6px 0 rgba(29, 80, 77, .15), 0 16px 28px -14px rgba(29, 80, 77, .45); pointer-events: auto; animation: halo-pop .25s ease-out; }
+.halo3d-bubble[hidden] { display: none; }
+.halo3d-bubble p { margin: 0 1.1rem .4rem 0; font-size: 1rem; line-height: 1.4; font-weight: 600; color: var(--ink); min-height: 1.4em; }
+.halo-x { position: absolute; top: .2rem; right: .35rem; border: 0; background: none; font-size: 1.5rem; line-height: 1; color: var(--ink-3); cursor: pointer; }
+.halo-row { display: flex; justify-content: flex-end; }
+.halo-off { border: 0; background: none; color: var(--ink-3); font: inherit; font-size: .82rem; text-decoration: underline; cursor: pointer; padding: 0; }
+.halo-wake { position: fixed; left: 1rem; bottom: 1rem; z-index: 60; border: 2px solid var(--teal-deep); background: #fff; color: var(--teal-deep); border-radius: 999px; padding: .35rem .8rem; font: inherit; font-weight: 700; font-size: .85rem; cursor: pointer; box-shadow: 0 3px 0 rgba(29, 80, 77, .2); }
+
+/* the "tap here" glow on the element Halo is pointing at */
+.halo-point { position: relative; z-index: 2; outline: 4px solid #ffc83d; outline-offset: 4px; border-radius: 14px; animation: halo-glow 1.2s ease-in-out infinite; }
+
+@keyframes halo-float { 50% { transform: translateY(-4px); } }
+@keyframes halo-pop { from { opacity: 0; transform: scale(.95); } }
+@keyframes halo-glow { 50% { outline-color: #fff0b3; box-shadow: 0 0 0 10px rgba(255, 200, 61, .35); } }
+@media (prefers-reduced-motion: reduce) { .halo3d-flat, .halo3d-bubble, .halo-point { animation: none; } }
+@media (max-width: 520px) { .halo3d { width: 120px; } }
+@media print { .halo3d, .halo-wake { display: none; } }

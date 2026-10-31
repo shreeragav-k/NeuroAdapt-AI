@@ -22,6 +22,7 @@ import { startFaceTracking, preloadFaceModel } from "./flow/facetrack.js";
 import { makeGame } from "./flow/engines.js";
 import { cameraLog } from "./flow/camera.js";
 import { preloadHandModel } from "./flow/handtrack.js";
+import * as Guide from "./flow/guide.js";
 
 const $main = document.getElementById("main");
 const $nav = document.getElementById("nav");
@@ -101,6 +102,7 @@ function route() {
   if (!view) return nav(canonical(p));
   setTitle({ login: "Sign in", test: "Assessment", assessment: "Assessment report", plan: "Your plan", session: "Daily session", reports: "Reports", report: "Report", extra: "Suggested game", privacy: "Privacy and camera" }[name]);
   view(p, arg);
+  Guide.update(name, p);
 }
 
 // -------------------------------------------------------------------- sign in
