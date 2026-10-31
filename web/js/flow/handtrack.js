@@ -12,7 +12,7 @@
 // a camera that is still "in use" cannot be opened a second time), a busy camera is retried, and the hand
 // model is loaded once and kept for every later game instead of being rebuilt.
 
-const BASE = "/vendor/mediapipe";
+const BASE = new URL("../../vendor/mediapipe", import.meta.url).href;
 
 let activeStream = null;          // the one open camera stream
 let landmarker = null;            // the hand model, kept between games

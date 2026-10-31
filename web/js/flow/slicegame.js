@@ -16,9 +16,9 @@ function ensurePictures() {
   if (have() === total) return Promise.resolve();
   if (!PIC.loading) {
     PIC.loading = Promise.all([
-      ...FRUIT_NAMES.map((n) => loadImage(`/img/slice/whole/${n}.png`).then((i) => { PIC.whole[n] = i; })),
-      ...FRUIT_NAMES.flatMap((n) => [1, 2].map((k) => loadImage(`/img/slice/half/${n}_half_${k}.png`).then((i) => { PIC.half[`${n}${k}`] = i; }))),
-      loadImage("/img/slice/grenade.png").then((i) => { PIC.bomb = i; }),
+      ...FRUIT_NAMES.map((n) => loadImage(`img/slice/whole/${n}.png`).then((i) => { PIC.whole[n] = i; })),
+      ...FRUIT_NAMES.flatMap((n) => [1, 2].map((k) => loadImage(`img/slice/half/${n}_half_${k}.png`).then((i) => { PIC.half[`${n}${k}`] = i; }))),
+      loadImage("img/slice/grenade.png").then((i) => { PIC.bomb = i; }),
     ]).finally(() => { PIC.loading = null; });
   }
   return PIC.loading;

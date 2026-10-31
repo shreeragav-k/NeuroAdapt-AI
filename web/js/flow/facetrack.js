@@ -9,7 +9,7 @@
 import { acquireStream } from "./handtrack.js";
 import { Smoother } from "./expressions.js";
 
-const BASE = "/vendor/mediapipe";
+const BASE = new URL("../../vendor/mediapipe", import.meta.url).href;
 let model = null, loading = null;
 
 async function loadModel() {

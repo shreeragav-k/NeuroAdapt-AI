@@ -6,7 +6,7 @@ import { startHandTracking } from "./handtrack.js";
 import { createCamera, cameraSupported } from "./camera.js";
 import { icon } from "./icons.js";
 
-const IMG = "/img/fruit/";
+const IMG = "img/fruit/";
 const BEST_KEY = "neuroadapt:fruit:best";
 const COL = { ivory: "#f6f1e7", stone: "#eae3d5", line: "#d6cdbc", teal: "#2b6e6a", pale: "#d6e6e2", ink: "#181b1f", clay: "#a64a3a" };
 const FONT = '600 28px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif';

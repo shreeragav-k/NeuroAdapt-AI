@@ -23,8 +23,8 @@ function ensurePictures() {
   if (loaded()) return Promise.resolve();
   if (!PIC.loading) {
     PIC.loading = Promise.all([
-      ...Object.keys(ANIMALS).map((a) => loadImage(`/img/feed/${a}.png`).then((i) => { PIC.animals[a] = i; })),
-      ...FOODS.map((f) => loadImage(`/img/feed/${f}.png`).then((i) => { PIC.food[f] = i; })),
+      ...Object.keys(ANIMALS).map((a) => loadImage(`img/feed/${a}.png`).then((i) => { PIC.animals[a] = i; })),
+      ...FOODS.map((f) => loadImage(`img/feed/${f}.png`).then((i) => { PIC.food[f] = i; })),
     ]).finally(() => { PIC.loading = null; });
   }
   return PIC.loading;
