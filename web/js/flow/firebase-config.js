@@ -9,4 +9,12 @@
 //   messagingSenderId: "...",
 //   appId: "...",
 // };
-export const FIREBASE_CONFIG = null;
+export const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDQrpfhWhfsTJyDjXQq0xp5eWKGAXPleg4",
+  authDomain: "halcyon-6d2b0.firebaseapp.com",
+  projectId: "halcyon-6d2b0",
+  storageBucket: "halcyon-6d2b0.firebasestorage.app",
+  messagingSenderId: "717971730527",
+  appId: "1:717971730527:web:5c2811577fc74d3c7b6bea",
+  measurementId: "G-4G1JBMMZN9",
+};
