@@ -1119,17 +1119,18 @@ test("suggested games: the two games are extras, not part of any list of 10 and 
   const css = readFileSync(new URL("../web/css/flow.css", import.meta.url), "utf8"); assert.match(css, /\.area-social-thinking/); assert.match(css, /--a-social-thinking/);
 });
 
-test("suggested games: offered from the lowest skill areas, from the condition, from both, or not at all", () => {
-  assert.deepEqual(L.suggestionsFor(learner("Fine", 30, "", ALL_GOOD)).map((s) => s.id), [], "nothing is wrong, nothing is suggested");
+test("suggested games: both are always offered; the ones that fit (skill area, condition, both) come first", () => {
+  const fine = L.suggestionsFor(learner("Fine", 30, "", ALL_GOOD)); assert.deepEqual(fine.map((s) => s.id).sort(), ["face", "slice"], "both games are offered even when nothing is wrong");
+  for (const s of fine) { assert.equal(s.byArea.length, 0); assert.equal(s.byCondition, false); assert.match(s.reason, /^An extra to try\. It trains /); }
   const weakFlex = L.suggestionsFor(learner("Flex", 30, "", { ...ALL_GOOD, "Flexible thinking": 40 }));
-  assert.deepEqual(weakFlex.map((s) => s.id), ["face"]); assert.match(weakFlex[0].reason, /Flexible thinking is among your lowest skill areas/); assert.equal(weakFlex[0].byCondition, false);
+  assert.deepEqual(weakFlex.map((s) => s.id), ["face", "slice"]); assert.match(weakFlex[0].reason, /Flexible thinking is among your lowest skill areas/); assert.equal(weakFlex[0].byCondition, false);
   const weakFast = L.suggestionsFor(learner("Fast", 30, "", { ...ALL_GOOD, "Processing speed": 30, "Self-control": 50 }));
-  assert.deepEqual(weakFast.map((s) => s.id), ["slice"]); assert.match(weakFast[0].reason, /Self-control and Processing speed are among your lowest/);
-  const aut = L.suggestionsFor(learner("Aut", 8, "Autism spectrum", ALL_GOOD)); assert.deepEqual(aut.map((s) => s.id), ["face"]); assert.match(aut[0].reason, /condition/); assert.equal(aut[0].byCondition, true);
-  const adhd = L.suggestionsFor(learner("Adhd", 8, "ADHD", ALL_GOOD)); assert.deepEqual(adhd.map((s) => s.id), ["slice"]);
-  const both = L.suggestionsFor(learner("Both", 8, "Autism and ADHD", ALL_GOOD)); assert.deepEqual(both.map((s) => s.id).sort(), ["face", "slice"]);
+  assert.deepEqual(weakFast.map((s) => s.id), ["slice", "face"]); assert.match(weakFast[0].reason, /Self-control and Processing speed are among your lowest/);
+  const aut = L.suggestionsFor(learner("Aut", 8, "Autism spectrum", ALL_GOOD)); assert.deepEqual(aut.map((s) => s.id), ["face", "slice"]); assert.match(aut[0].reason, /condition/); assert.equal(aut[0].byCondition, true);
+  const adhd = L.suggestionsFor(learner("Adhd", 8, "ADHD", ALL_GOOD)); assert.deepEqual(adhd.map((s) => s.id), ["slice", "face"]);
+  const both = L.suggestionsFor(learner("Both", 8, "Autism and ADHD", ALL_GOOD)); assert.deepEqual(both.map((s) => s.id).sort(), ["face", "slice"]); assert.ok(both.every((s) => s.byCondition));
   const mixed = L.suggestionsFor(learner("Mix", 8, "Autism", { ...ALL_GOOD, Attention: 40 })); assert.match(mixed[0].reason, /Attention is among your lowest skill areas, and it also fits the condition/);
-  assert.deepEqual(L.suggestionsFor(learner("Other", 8, "Asthma", ALL_GOOD)).map((s) => s.id), [], "an unrelated condition suggests nothing");
+  assert.deepEqual(L.suggestionsFor(learner("Other", 8, "Asthma", ALL_GOOD)).map((s) => s.id).sort(), ["face", "slice"], "an unrelated condition still gets both, as general extras");
   // no suggestions before the assessment is done and viewed
   assert.deepEqual(L.suggestionsFor(login("New", 8, "Autism")), []);
   // the game handed over belongs to the player's age group and level

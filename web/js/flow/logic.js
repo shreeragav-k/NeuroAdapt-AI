@@ -130,9 +130,11 @@ export function focusAreas(p, n = 2) {
 }
 
 // ------------------------------------------------------------ suggested games
-// A suggested game is an optional extra beside the 10 games of the level. It is offered when
+// A suggested game is an optional extra beside the 10 games of the level. Both are always offered once the
+// assessment is done; the reason on the card says why this one fits the player best:
 //   - one of the player's lowest skill areas (latest report, below the promotion line) is one the game trains, or
-//   - the health condition they gave at sign-up contains a word that points to it.
+//   - the health condition they gave at sign-up contains a word that points to it, or
+//   - neither: it is offered as a general extra, and the ones that fit come first.
 // It never changes the level: its score is kept and shown in the report, and that is all.
 export const suggestionGame = (def, groupId, level) => ({
   id: `${groupId}-x-${def.id}`, group: groupId, phase: "suggested", order: 0, difficulty: null,
@@ -145,12 +147,11 @@ export function suggestionsFor(p) {
   const level = p.level || "easy", weak = focusAreas(p, 3).map((f) => f.area), out = [];
   for (const def of SUGGESTIONS) {
     const hits = def.areas.filter((a) => weak.includes(a)), byCondition = !!(p.condition && def.condition.test(p.condition));
-    if (!hits.length && !byCondition) continue;
     const why = [hits.length ? `${listWords(hits)} ${hits.length === 1 ? "is" : "are"} among your lowest skill areas` : "", byCondition ? "of the condition you told us about" : ""].filter(Boolean);
-    const reason = hits.length && byCondition ? `${why[0]}, and it also fits the condition you told us about.` : hits.length ? `${why[0]}, and this game trains ${hits.length === 1 ? "it" : "them"}.` : "It is suggested because of the condition you told us about.";
+    const reason = hits.length && byCondition ? `${why[0]}, and it also fits the condition you told us about.` : hits.length ? `${why[0]}, and this game trains ${hits.length === 1 ? "it" : "them"}.` : byCondition ? "It is suggested because of the condition you told us about." : `An extra to try. It trains ${listWords(def.areas.map((a) => a.toLowerCase()))}.`;
     out.push({ id: def.id, title: def.title, skill: def.skill, reason, byArea: hits, byCondition, game: suggestionGame(def, p.groupId, level) });
   }
-  return out;
+  return out.sort((a, b) => (b.byArea.length + (b.byCondition ? 1 : 0)) - (a.byArea.length + (a.byCondition ? 1 : 0)));
 }
 
 // Keep the result of a suggested game. It goes in the player's list and in that day's daily report (if there is one).
