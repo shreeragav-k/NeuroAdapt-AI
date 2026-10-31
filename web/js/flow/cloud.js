@@ -77,7 +77,7 @@ export function flush() {
     try {
       const f = await init();
       await f.setDoc(f.doc(f.db, "players", p.key), {
-        key: p.key, email: p.email || "", name: p.name, age: p.age, groupId: p.groupId, condition: p.condition || "",
+        key: p.key, email: p.email || "", name: p.name, age: p.age, dob: p.dob || "", groupId: p.groupId, condition: p.condition || "",
         level: p.level, stage: p.test.completed ? "learning" : "assessment", sessions: p.sessions.length,
         updated: p.updated || Date.now(), data: JSON.stringify(p),
       });

@@ -31,4 +31,4 @@ export function icon(name, size = 20, cls = "") {
 export const ICON_NAMES = Object.keys(P);
 
 // The Halcyon mark: calm water.
-export const markSvg = (size = 34) => `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1d504d"/><path d="M5 21c3.5-5 7-5 11 0s7.5 5 11 0" fill="none" stroke="#d6e6e2" stroke-width="2.4" stroke-linecap="round"/><path d="M5 14.5c3.5-5 7-5 11 0s7.5 5 11 0" fill="none" stroke="#f6f1e7" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+export const markSvg = (size = 34) => `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#2478e5"/><path d="M5 21c3.5-5 7-5 11 0s7.5 5 11 0" fill="none" stroke="#dff9fa" stroke-width="2.4" stroke-linecap="round"/><path d="M5 14.5c3.5-5 7-5 11 0s7.5 5 11 0" fill="none" stroke="#f6f1e7" stroke-width="2.4" stroke-linecap="round"/></svg>`;
