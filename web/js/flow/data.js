@@ -24,8 +24,8 @@ export const BANDS = { easy: [1, 2], medium: [3, 4], hard: [5, 6] };
 
 export const RULES = {
   testGames: 5,
-  testRounds: 6,          // trials per assessment game
-  sessionRounds: 8,       // default trials per practice game
+  testRounds: 3,          // trials per assessment game
+  sessionRounds: 3,       // default trials per practice game
   sessionGames: 10,       // games per daily session (= games per level)
   startStep: 3,           // assessment staircase starts in the middle
   minStep: 1,
@@ -50,9 +50,9 @@ const G1 = {
     ["t5", "sequence", "animals", "", "Animal Echo", "Short-term memory", 5, "Watch the animals light up and sing. Then tap them in the same order."],
   ],
   easy: [
-    ["e01", "fruit", "lanes", "g1-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. You have 3 lives and 30 seconds."],
-    ["e02", "search", "fruits", "", "Find the Apples", "Selective attention", 2, "Tap every apple. Leave everything else alone."],
-    ["e03", "series", "animals", "", "Animal Train", "Pattern reasoning", 3, "Look at the animal pattern and tap the animal that comes next."],
+    ["e01", "fruit", "lanes", "g1-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. 3 rounds, and you have 3 lives."],
+    ["e02", "trace", "path", "g1-easy", "Paint the Path", "Visuomotor control", 2, "Move your finger along the dotted path, from the glowing start to the star. Stay on the line. Two shapes: a line and a circle."],
+    ["e03", "feed", "animals", "g1-easy", "Feed the Animal", "Associative memory", 3, "Pinch a food, drag it to the animal's mouth and let go. Three animals, each with a favourite food, and a hint tells you which."],
     ["e04", "order", "numbers", "", "Number Walk", "Attention and sequencing", 4, "Tap the numbers in order: 1, 2, 3 and on."],
     ["e05", "pairs", "pictures", "", "Picture Pairs", "Visual memory", 5, "Turn two cards at a time. Remember where the matching pictures are."],
     ["e06", "objloc", "pictures", "", "Where Did It Hide", "Spatial memory", 6, "Look where each picture sits. Then tap the place where this one was."],
@@ -62,9 +62,9 @@ const G1 = {
     ["e10", "sequence", "fruits", "", "Fruit Echo", "Short-term memory", 10, "Watch the fruit light up and play a note. Tap them in the same order."],
   ],
   medium: [
-    ["m01", "fruit", "lanes", "g1-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. You have 3 lives and 45 seconds."],
-    ["m02", "odd", "size", "", "Odd Size Out", "Visual attention", 2, "One picture is a different size. Tap it."],
-    ["m03", "gonogo", "vehicles", "", "Bus or Car", "Response inhibition", 3, "Tap the bus. Wait for the other vehicles."],
+    ["m01", "fruit", "lanes", "g1-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. 3 rounds, and you have 3 lives."],
+    ["m02", "trace", "path", "g1-medium", "Paint the Path", "Visuomotor control", 2, "Follow the dotted path from the glowing start to the star and stay close to the line. Two shapes: a circle and a zigzag."],
+    ["m03", "feed", "animals", "g1-medium", "Feed the Animal", "Associative memory", 3, "Feed three animals the food each one loves. The hint shows only for a moment, so remember it. Four foods to choose from."],
     ["m04", "order", "size", "", "Small to Big", "Attention and sequencing", 4, "Tap the circles from the smallest to the biggest."],
     ["m05", "recall", "fruits", "", "Fruit Memory", "Visual memory", 5, "Look at the fruit. It hides. Then tap the fruit you saw."],
     ["m06", "sequence", "positions", "", "Dance Steps", "Spatial memory", 6, "Watch the squares light up, then tap them in the same order."],
@@ -74,9 +74,9 @@ const G1 = {
     ["m10", "delayed", "animals", "", "Remember and Wait", "Delayed memory", 10, "Look at the animals. Count while you wait. Then tap the one you saw."],
   ],
   hard: [
-    ["h01", "fruit", "lanes", "g1-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it speeds up. 3 lives and 60 seconds."],
-    ["h02", "series", "tinted", "", "Double Train", "Pattern reasoning", 2, "The animal and its colour follow a pattern. Tap what comes next."],
-    ["h03", "search", "conjunction", "", "Find the Red Fish", "Selective attention", 3, "Tap every red fish. Not the blue fish, not the red birds."],
+    ["h01", "fruit", "lanes", "g1-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it falls faster. 3 rounds, 3 lives."],
+    ["h02", "trace", "path", "g1-hard", "Paint the Path", "Visuomotor control", 2, "Trace the path from start to star as exactly as you can; the line is narrow. Two shapes: a zigzag and a crown."],
+    ["h03", "feed", "animals", "g1-hard", "Feed the Animal", "Associative memory", 3, "Feed each animal its favourite food with no hint, from five foods. Three animals."],
     ["h04", "switch", "animalcolor", "", "Colour or Animal", "Mental flexibility", 4, "Follow the rule at the top. It changes, so read it each time."],
     ["h05", "pairs", "numbers", "", "Number and Dots Pairs", "Associative memory", 5, "Match each number with the group of dots that shows it."],
     ["h06", "recall", "animals", "missing", "What Went Missing", "Visual memory", 6, "Look at the animals. One goes missing. Tap the one that left."],
@@ -96,9 +96,9 @@ const G2 = {
     ["t5", "series", "number", "", "Number Pattern", "Pattern reasoning", 5, "Find the rule and choose the next number."],
   ],
   easy: [
-    ["e01", "fruit", "lanes", "g2-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. You have 3 lives and 30 seconds."],
-    ["e02", "order", "countdown", "", "Count Down", "Attention and sequencing", 2, "Tap the numbers backwards, from the biggest to 1."],
-    ["e03", "gonogo", "digit", "", "Even Numbers Only", "Response inhibition", 3, "Tap even numbers. Do not tap odd numbers."],
+    ["e01", "fruit", "lanes", "g2-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. 3 rounds, and you have 3 lives."],
+    ["e02", "trace", "path", "g2-easy", "Paint the Path", "Visuomotor control", 2, "Move your finger along the dotted path, from the glowing start to the star. Stay on the line. Two shapes: a line and a circle."],
+    ["e03", "feed", "animals", "g2-easy", "Feed the Animal", "Associative memory", 3, "Pinch a food, drag it to the animal's mouth and let go. Three animals, each with a favourite food, and a hint tells you which."],
     ["e04", "mirror", "mirror", "", "Mirror Image", "Spatial reasoning", 4, "Choose the pattern that is the mirror image."],
     ["e05", "analogy", "words", "", "Word Analogies", "Verbal reasoning", 5, "Find the word that completes the pair in the same way."],
     ["e06", "pairs", "words", "", "Opposite Pairs", "Associative memory", 6, "Turn two cards at a time. Find each word and its opposite."],
@@ -108,9 +108,9 @@ const G2 = {
     ["e10", "delayed", "letters", "", "Letters After a Pause", "Delayed memory", 10, "Study the letters. Count backwards while you wait. Then pick a letter you saw."],
   ],
   medium: [
-    ["m01", "fruit", "lanes", "g2-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. You have 3 lives and 45 seconds."],
-    ["m02", "stroop", "color", "", "Ink Colour", "Response inhibition", 2, "Tap the COLOUR the word is written in, not what it says."],
-    ["m03", "switch", "parity", "", "Odd, Even, Big, Small", "Mental flexibility", 3, "Follow the rule at the top. It changes, so read it each time."],
+    ["m01", "fruit", "lanes", "g2-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. 3 rounds, and you have 3 lives."],
+    ["m02", "trace", "path", "g2-medium", "Paint the Path", "Visuomotor control", 2, "Follow the dotted path from the glowing start to the star and stay close to the line. Two shapes: a circle and a zigzag."],
+    ["m03", "feed", "animals", "g2-medium", "Feed the Animal", "Associative memory", 3, "Feed three animals the food each one loves. The hint shows only for a moment, so remember it. Four foods to choose from."],
     ["m04", "mirror", "rotate", "", "Turn It Around", "Spatial reasoning", 4, "Choose the pattern after it is turned a quarter turn clockwise."],
     ["m05", "matrix", "shapes", "", "Missing Piece", "Abstract reasoning", 5, "Find the rule in the grid and choose the piece that completes it."],
     ["m06", "sequence", "letters", "", "Letter Echo", "Short-term memory", 6, "Watch the letters light up and play a note, then tap them in the same order."],
@@ -120,9 +120,9 @@ const G2 = {
     ["m10", "span", "revdigits", "", "Digits Backwards", "Working memory", 10, "Watch the numbers, then tap them in REVERSE order."],
   ],
   hard: [
-    ["h01", "fruit", "lanes", "g2-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it speeds up. 3 lives and 60 seconds."],
-    ["h02", "symbolcode", "digits", "", "Symbol Code", "Processing speed", 2, "Use the key to find the number for each symbol."],
-    ["h03", "logic", "order", "", "Who Is Tallest", "Logical reasoning", 3, "Read the clues and work out who it is."],
+    ["h01", "fruit", "lanes", "g2-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it falls faster. 3 rounds, 3 lives."],
+    ["h02", "trace", "path", "g2-hard", "Paint the Path", "Visuomotor control", 2, "Trace the path from start to star as exactly as you can; the line is narrow. Two shapes: a zigzag and a crown."],
+    ["h03", "feed", "animals", "g2-hard", "Feed the Animal", "Associative memory", 3, "Feed each animal its favourite food with no hint, from five foods. Three animals."],
     ["h04", "route", "arrows", "", "Map Moves", "Spatial working memory", 4, "Follow the arrows from the start square and say where you finish."],
     ["h05", "order", "trail", "", "Trail Making", "Mental flexibility", 5, "Tap in order, switching between numbers and letters: 1, A, 2, B, 3, C."],
     ["h06", "objloc", "letters", "", "Where Was the Letter", "Spatial memory", 6, "Study where the letters sit. Then tap the place where this letter was."],
@@ -142,9 +142,9 @@ const G3 = {
     ["t5", "delayed", "words", "", "Delayed Word Recall", "Delayed memory", 5, "Study the words. Count backwards while you wait. Then pick a word you saw."],
   ],
   easy: [
-    ["e01", "fruit", "lanes", "g3-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. You have 3 lives and 30 seconds."],
-    ["e02", "gonogo", "wordcategory", "", "Animals Only", "Response inhibition", 2, "Tap the animal words. Do not tap any other word."],
-    ["e03", "mirror", "flip", "", "Flip Check", "Spatial reasoning", 3, "Choose the pattern after it is flipped upside down."],
+    ["e01", "fruit", "lanes", "g3-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. 3 rounds, and you have 3 lives."],
+    ["e02", "trace", "path", "g3-easy", "Paint the Path", "Visuomotor control", 2, "Move your finger along the dotted path, from the glowing start to the star. Stay on the line. Two shapes: a line and a circle."],
+    ["e03", "feed", "animals", "g3-easy", "Feed the Animal", "Associative memory", 3, "Pinch a food, drag it to the animal's mouth and let go. Three animals, each with a favourite food, and a hint tells you which."],
     ["e04", "series", "numberalt", "", "Two-Track Series", "Pattern reasoning", 4, "Two rules alternate. Choose the next number."],
     ["e05", "pairs", "symbols", "", "Symbol Pairs", "Visual memory", 5, "Turn two cards at a time. Remember where the matching symbols are."],
     ["e06", "recall", "positions", "", "Where Was It", "Spatial memory", 6, "Study the lit squares, then choose the same layout."],
@@ -154,9 +154,9 @@ const G3 = {
     ["e10", "story", "news", "", "Short Story Recall", "Episodic memory", 10, "Read the short news item. Then answer a question about it."],
   ],
   medium: [
-    ["m01", "fruit", "lanes", "g3-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. You have 3 lives and 45 seconds."],
-    ["m02", "switch", "letternumber", "", "Letter or Number", "Mental flexibility", 2, "Follow the rule at the top. It changes, so read it each time."],
-    ["m03", "logic", "syllogism", "", "Valid Conclusion", "Logical reasoning", 3, "Choose the statement that must be true."],
+    ["m01", "fruit", "lanes", "g3-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. 3 rounds, and you have 3 lives."],
+    ["m02", "trace", "path", "g3-medium", "Paint the Path", "Visuomotor control", 2, "Follow the dotted path from the glowing start to the star and stay close to the line. Two shapes: a circle and a zigzag."],
+    ["m03", "feed", "animals", "g3-medium", "Feed the Animal", "Associative memory", 3, "Feed three animals the food each one loves. The hint shows only for a moment, so remember it. Four foods to choose from."],
     ["m04", "mirror", "mentalrotation", "", "Mental Rotation", "Spatial reasoning", 4, "Choose the pattern that is the same shape, just turned."],
     ["m05", "matrix", "rotation", "", "Turning Matrix", "Abstract reasoning", 5, "Find the rule in the grid and choose the piece that completes it."],
     ["m06", "sequence", "greek", "", "Greek Echo", "Short-term memory", 6, "Watch the symbols light up and play a note, then tap them in the same order."],
@@ -166,9 +166,9 @@ const G3 = {
     ["m10", "nback", "position", "", "Position One-Back", "Working memory", 10, "Is this square in the same place as the one just before?"],
   ],
   hard: [
-    ["h01", "fruit", "lanes", "g3-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it speeds up. 3 lives and 60 seconds."],
-    ["h02", "symbolcode", "reverse", "", "Reverse Code", "Processing speed", 2, "Use the key to find the symbol for each letter."],
-    ["h03", "analogy", "abstract", "", "Relationship Analogies", "Abstract reasoning", 3, "Find the word that completes the pair in the same way."],
+    ["h01", "fruit", "lanes", "g3-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it falls faster. 3 rounds, 3 lives."],
+    ["h02", "trace", "path", "g3-hard", "Paint the Path", "Visuomotor control", 2, "Trace the path from start to star as exactly as you can; the line is narrow. Two shapes: a zigzag and a crown."],
+    ["h03", "feed", "animals", "g3-hard", "Feed the Animal", "Associative memory", 3, "Feed each animal its favourite food with no hint, from five foods. Three animals."],
     ["h04", "arith", "serial", "", "Serial Subtraction", "Working memory", 4, "Keep subtracting by the same amount. Choose the next number."],
     ["h05", "route", "words", "", "Grid Directions", "Spatial working memory", 5, "Follow the directions from the start square and say where you finish."],
     ["h06", "recall", "words", "missing", "Missing Word", "Verbal memory", 6, "Look at the words. One disappears. Tap the one that left."],
@@ -183,6 +183,10 @@ const SOURCE = { g1: G1, g2: G2, g3: G3 };
 
 // The classic cognitive task behind each kind of game, and what it trains (shown before every game).
 export const TASK_INFO = {
+  face: ["Facial expression imitation", "Social cognition: telling expressions apart and making them yourself, with some self-monitoring and quick switching between faces. Played in front of the camera; without a camera you pick the matching face."],
+  slice: ["Go / No-Go with moving targets", "Hand-eye coordination and response inhibition: cutting what flies past (fruit) and keeping clear of what must be left alone (the bomb), at speed. Played with your fingertip in front of the camera, a mouse or a finger."],
+  trace: ["Pursuit tracing (path tracing)", "Visuomotor control and sustained attention: guiding your hand along a path and keeping to it, the skill behind drawing and writing. Played with your fingertip in front of the camera, a mouse or a finger on the screen."],
+  feed: ["Paired-associate learning with movement", "Associative memory: knowing which food goes with which animal, then picking it from several foods and carrying it to the right place. Played by pinching in front of the camera, or with a mouse or finger."],
   fruit: ["Go / No-Go with movement", "Response inhibition and attention: acting on the fruit, holding back from the chocolate, and moving the whole body to meet what falls. Played with your hand in front of the camera, the arrow keys or a finger."],
   reaction: ["Simple reaction time", "How fast you notice and respond. Speed of processing underlies every other skill."],
   odd: ["Visual discrimination", "Spotting what differs, which sharpens attention to detail."],
@@ -206,7 +210,6 @@ export const TASK_INFO = {
   stroop: ["Stroop task", "Selective attention and inhibition: ignoring the automatic reading of a word."],
   symbolcode: ["Symbol-digit coding", "Processing speed with a short-term memory load, a standard speed test."],
   route: ["Route following", "Spatial working memory: tracking where moves take you."],
-  logic: ["Logical reasoning", "Drawing a firm conclusion from the information given."],
   analogy: ["Analogical reasoning", "Seeing how two things relate and applying that relation to a new pair."],
   matrix: ["Matrix reasoning", "Abstract reasoning in the style of Raven's matrices."],
   arith: ["Serial subtraction", "Working memory and attention under mental load."],
@@ -337,15 +340,37 @@ export const ANALOGIES = {
 // ------------------------------------------------- cognitive skill areas
 // Every game's skill label belongs to one broad area. Reports and charts group by area,
 // so results can be compared across the assessment and the three levels.
-export const DOMAINS = ["Memory", "Attention", "Self-control", "Reasoning", "Flexible thinking", "Spatial thinking", "Processing speed"];
+export const DOMAINS = ["Memory", "Attention", "Self-control", "Reasoning", "Flexible thinking", "Spatial thinking", "Processing speed", "Social thinking"];
 const AREA = {
   Memory: ["Short-term memory", "Working memory", "Spatial working memory", "Visual memory", "Spatial memory", "Verbal memory", "Associative memory", "Episodic memory", "Delayed memory"],
   Attention: ["Visual attention", "Selective attention", "Attention and sequencing", "Visual perception"],
   "Self-control": ["Response inhibition"],
   Reasoning: ["Pattern reasoning", "Abstract reasoning", "Logical reasoning", "Verbal reasoning", "Concept formation"],
   "Flexible thinking": ["Mental flexibility"],
-  "Spatial thinking": ["Spatial reasoning"],
-  "Processing speed": ["Processing speed", "Reaction speed", "Timing"],
+  "Spatial thinking": ["Spatial reasoning", "Visuomotor control"],
+  "Processing speed": ["Processing speed", "Reaction speed", "Timing", "Hand-eye coordination"],
+  "Social thinking": ["Social cognition"],
 };
 export const DOMAIN_OF = Object.freeze(Object.fromEntries(Object.entries(AREA).flatMap(([d, skills]) => skills.map((s) => [s, d]))));
 export const domainOf = (skill) => DOMAIN_OF[skill] || null;
+
+// ------------------------------------------------------------ suggested games
+// Not part of the 10 games of a level. They are offered as optional extras when the player's results or the
+// condition they gave at sign-up point to them:
+//   areas      the skill areas that, when they are among the player's lowest, suggest the game
+//   condition  words in the (optional) health condition that suggest it
+export const SUGGESTIONS = Object.freeze([
+  Object.freeze({
+    id: "face", engine: "face", content: "expressions", title: "Make a Face", skill: "Social cognition",
+    how: "A face is shown. Make the same face in front of the camera and hold it for a moment before time runs out. Three rounds.",
+    areas: Object.freeze(["Flexible thinking", "Attention"]),
+    condition: /autis|asd\b|asperger|social|emotion|communicat|speech|selective mutism|anxiety/i,
+  }),
+  Object.freeze({
+    id: "slice", engine: "slice", content: "fruits", title: "Cut the Fruit", skill: "Hand-eye coordination",
+    how: "Fruit flies up the screen. Swipe through every fruit and keep clear of the bomb. Three rounds.",
+    areas: Object.freeze(["Self-control", "Processing speed", "Spatial thinking"]),
+    condition: /adhd|attention|hyperactiv|impuls|dyspraxia|coordination|motor|cerebral palsy/i,
+  }),
+]);
+export const suggestionById = (id) => SUGGESTIONS.find((s) => s.id === id) || null;

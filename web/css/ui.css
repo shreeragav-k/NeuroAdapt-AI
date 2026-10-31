@@ -313,3 +313,31 @@ footer.site p { margin: 0; max-width: 46rem; }
 .report ul.plain { margin: .6rem 0 1rem; padding-left: 1.2rem; display: grid; gap: .35rem; }
 @media (max-width: 640px) { .spark text { font-size: 17px; } }
 .fc-retry { font-size: .95rem; margin-top: .2rem; }
+
+/* movement games 2 and 3 (Paint the Path, Feed the Animal) share the Fruit Catcher frame */
+.fc-val { font-family: var(--serif); font-size: 2.2rem; line-height: 1.05; color: var(--teal-deep); font-weight: 340; }
+.fc-status { margin: 0; min-height: 1.5em; text-align: center; font-size: .98rem; color: var(--teal-deep); font-weight: 500; }
+.fc-choices { display: grid; gap: .6rem; justify-items: center; }
+.fc-choices .btn { width: 100%; }
+.fc-overlay { overflow: auto; }
+.fc-card { margin: auto; }
+.fc-stars { display: inline-flex; gap: .2rem; justify-content: center; }
+.fc-table { width: 100%; border-collapse: collapse; font-size: .98rem; }
+.fc-table td { padding: .35rem .3rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.fc-table td:not(:first-child) { text-align: right; white-space: nowrap; }
+.fc-table .fc-stars svg { width: 22px; height: 22px; }
+@media (max-width: 700px) { .fc-val { font-size: 1.8rem; } }
+.fc-cam.inline { position: static; width: min(100%, 15rem); margin: .7rem auto 0; }
+.fc-cam.inline[hidden] { display: none; }
+
+/* suggested games (plan page) */
+.suglist { list-style: none; margin: 0; padding: 0; display: grid; gap: .8rem; }
+.suglist li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .9rem 1rem; border: 1px solid var(--line); border-left: 4px solid var(--area, var(--teal)); border-radius: 14px; background: var(--paper); }
+.suglist b { font-family: var(--serif); font-size: 1.15rem; font-weight: 400; margin-right: .5rem; }
+.suglist p { margin: .3rem 0 .2rem; color: var(--ink-2); font-size: .98rem; }
+
+/* suggested games (plan page) */
+.suglist { list-style: none; margin: 0; padding: 0; display: grid; gap: .8rem; }
+.suglist li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .9rem 1rem; border: 1px solid var(--line); border-left: 4px solid var(--area, var(--teal)); border-radius: 14px; background: var(--paper); }
+.suglist b { font-family: var(--serif); font-size: 1.15rem; font-weight: 400; margin-right: .5rem; }
+.suglist p { margin: .3rem 0 .2rem; color: var(--ink-2); font-size: .98rem; }

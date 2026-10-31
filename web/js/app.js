@@ -14,7 +14,13 @@ import { createAccount, signInAccount } from "./flow/auth.js";
 import { reportHtml, reportTitle, reportSummary, esc, VERDICT } from "./flow/report.js";
 import { icon, markSvg } from "./flow/icons.js";
 import { mountFruitCatcher } from "./flow/fruitgame.js";
-import { sessionPlay } from "./flow/fruitcatcher.js";
+import { mountPaintPath } from "./flow/paintgame.js";
+import { mountFeedAnimal } from "./flow/feedgame.js";
+import { mountMakeAFace } from "./flow/facegame.js";
+import { mountCutTheFruit } from "./flow/slicegame.js";
+import { startFaceTracking, preloadFaceModel } from "./flow/facetrack.js";
+import { makeGame } from "./flow/engines.js";
+import { cameraLog } from "./flow/camera.js";
 import { preloadHandModel } from "./flow/handtrack.js";
 
 const $main = document.getElementById("main");
@@ -80,7 +86,7 @@ function allowed(name, p) {
   const stage = L.stageOf(p);
   if (stage === "test") return name === "test";
   if (stage === "assessment") return name === "assessment";
-  return ["plan", "session", "reports", "report"].includes(name);
+  return ["plan", "session", "reports", "report", "extra"].includes(name);
 }
 
 function route() {
@@ -91,9 +97,9 @@ function route() {
   if (!allowed(name, p)) { const to = canonical(p); if (location.hash !== to) { location.hash = to; return; } }
   const stage = p ? L.stageOf(p) : null;
   renderNav(p, stage, name);
-  const view = { login: viewLogin, test: viewTest, assessment: viewAssessment, plan: viewPlan, session: viewSession, reports: viewReports, report: viewReport, privacy: viewPrivacy }[name];
+  const view = { login: viewLogin, test: viewTest, assessment: viewAssessment, plan: viewPlan, session: viewSession, reports: viewReports, report: viewReport, extra: viewExtra, privacy: viewPrivacy }[name];
   if (!view) return nav(canonical(p));
-  setTitle({ login: "Sign in", test: "Assessment", assessment: "Assessment report", plan: "Your plan", session: "Daily session", reports: "Reports", report: "Report", privacy: "Privacy and camera" }[name]);
+  setTitle({ login: "Sign in", test: "Assessment", assessment: "Assessment report", plan: "Your plan", session: "Daily session", reports: "Reports", report: "Report", extra: "Suggested game", privacy: "Privacy and camera" }[name]);
   view(p, arg);
 }
 
@@ -166,6 +172,7 @@ function viewLogin() {
 // Plays `games` one after another from `cfg.index()`; records each with `cfg.record`.
 const setbar = (cfg, games, i, g, state) => `<div class="setbar area-${slug(g.skill)}"><div class="s-row"><span><b>${esc(cfg.label)}</b></span><span>${state}</span></div><div class="segs" aria-hidden="true">${games.map((_, k) => `<i class="${k < i ? "on" : k === i ? "now" : ""}"></i>`).join("")}</div></div>`;
 
+const MOVEMENT = new Set(["fruit", "trace", "feed", "face", "slice"]);      // games 1 to 3 of every daily list, and the two suggested games: played with the camera, a mouse or a finger
 function runSet(p, cfg) {
   const games = cfg.games, tier = groupOf(p).tier;
   const step = () => {
@@ -181,14 +188,14 @@ function runSet(p, cfg) {
             <div><dt>Cognitive skill</dt><dd>${esc(g.skill)}</dd></div>
             <div><dt>Classic task</dt><dd>${esc(g.task)}</dd></div>
             <div class="wide"><dt>What it trains</dt><dd>${esc(g.trains)}</dd></div>
-            <div class="wide"><dt>Difficulty</dt><dd>${diffDots(g.difficulty, games.length)} <span class="muted small">game ${g.difficulty} of ${games.length}, from easiest to hardest</span></dd></div>
+            ${g.difficulty ? `<div class="wide"><dt>Difficulty</dt><dd>${diffDots(g.difficulty, games.length)} <span class="muted small">game ${g.difficulty} of ${games.length}, from easiest to hardest</span></dd></div>` : `<div class="wide"><dt>Suggested game</dt><dd>An extra, picked for you. It is scored and shown in your report, and it does not change your level.</dd></div>`}
           </dl>
           ${tier === 0 ? `<div class="notice">${icon("info", 18)}<span>A grown-up can read the instructions aloud and help with tapping.</span></div>` : ""}
-          ${g.engine === "fruit" ? `<div class="notice privacy">${icon("lock", 18)}<span><b>The camera is optional and the video is never recorded.</b> Your hand is found on this device, frame by frame, and nothing is saved or sent. Prefer not to use it? The arrow keys or a tap work just as well. <a href="#/privacy">More</a></span></div>` : ""}
+          ${MOVEMENT.has(g.engine) ? `<div class="notice privacy">${icon("lock", 18)}<span><b>The camera is optional and the video is never recorded.</b> You choose "Start with camera" or "Play without camera" when the game opens. With the camera, your hand is found on this device and nothing is saved or sent. A mouse or a finger works just as well. <a href="#/privacy">More</a></span></div>` : ""}
           <div class="actions"><button class="btn lg" id="go" type="button">${icon("play", 18)}Start game</button></div>
         </div></article></div></div>`);
     $("#go").onclick = () => play(i, g);
-    if (g.engine === "fruit") preloadHandModel();          // load the hand model while the card is being read
+    if (g.engine === "face") preloadFaceModel(); else if (MOVEMENT.has(g.engine)) preloadHandModel();      // load the model while the card is being read (no camera is touched)
   };
   const saved = (i, g, trials) => {
     stopGame = null;
@@ -202,13 +209,16 @@ function runSet(p, cfg) {
     setMain(`<div class="page"><div class="wrap fc-wrap area-${slug(g.skill)}"><h1 class="visually-hidden">${esc(g.title)}</h1>
       ${setbar(cfg, games, i, g, `${esc(g.title)} · game ${i + 1} of ${games.length}`)}
       <div class="card fc-card-wrap"><div id="fc-host"></div></div></div></div>`);
-    fruitGame = mountFruitCatcher($("#fc-host"), {
-      session: { ...sessionPlay(level, tier), steps: BANDS[level] },
+    // the three movement games share one way in: the round's settings come from the catalogue game
+    const session = { ...makeGame(g).trial(0, BANDS[level][0]), steps: BANDS[level] };
+    const mount = { fruit: mountFruitCatcher, trace: mountPaintPath, feed: mountFeedAnimal, face: (h, o) => mountMakeAFace(h, { ...o, tracker: startFaceTracking }), slice: mountCutTheFruit }[g.engine];
+    fruitGame = mount($("#fc-host"), {
+      session,
       onContinue: (trials) => { fruitGame && fruitGame.destroy(); fruitGame = null; saved(i, g, trials); },
     });
   };
   const play = (i, g) => {
-    if (g.engine === "fruit") return playMovement(i, g);
+    if (MOVEMENT.has(g.engine)) return playMovement(i, g);
     setMain(`<div class="page"><div class="wrap narrow play-wrap area-${slug(g.skill)}"><h1 class="visually-hidden">${esc(g.title)}</h1>
       ${setbar(cfg, games, i, g, `${esc(g.title)} · game ${i + 1} of ${games.length}`)}<div id="host"></div></div></div>`);
     const handle = playGame({
@@ -230,7 +240,7 @@ function runSet(p, cfg) {
           ? `<div class="stars" role="img" aria-label="${stars} of 3 stars">${[1, 2, 3].map((n) => shapeSvg("star", n <= stars ? "#e8b923" : "#d9d0bd", 52)).join("")}</div>
              <p class="lede">You got ${right} of ${trials.length} right (${acc}%).${longestRun(trials) >= 3 ? ` Longest run: ${longestRun(trials)} in a row.` : ""}</p>`
           : `<p class="lede">Well done. That game is finished.</p>`}
-        <button class="btn lg" id="nx" type="button">${last ? "See the report" : "Next game"}${icon("arrow", 18)}</button>
+        <button class="btn lg" id="nx" type="button">${last ? cfg.finishLabel || "See the report" : "Next game"}${icon("arrow", 18)}</button>
       </div></div></div>`);
     $("#nx").onclick = () => (last ? nav(cfg.afterLast(report)) : step());
   };
@@ -291,7 +301,8 @@ function viewPlan(p) {
   const today = S.today(), st = L.sessionState(p, today), level = p.current ? p.current.level : p.level;
   const games = L.levelGames(p.groupId, level), doneIds = new Set(p.current ? p.current.done.map((d) => d.gameId) : []);
   const doneCount = doneIds.size, finishedToday = st === "done_today", day = p.sessions.length + (p.current || st === "ready" ? 1 : 0) || p.sessions.length;
-  const nextDay = p.sessions.length + 1, progress = L.progressSummary(p);
+  const nextDay = p.sessions.length + 1, progress = L.progressSummary(p), suggested = L.suggestionsFor(p);
+  const lastExtra = (id) => { const e = [...(p.extras || [])].reverse().find((x) => x.gameId === id); return e ? `<span class="small muted">Last time: ${e.accuracy}% (${esc(e.date)})</span>` : ""; };
   const last = p.sessions[p.sessions.length - 1];
   const focus = L.focusAreas(p), focusSet = new Set(focus.map((f) => f.area)), scores = skillScores(p);
   const a = p.reports.find((r) => r.id === "assessment");
@@ -315,7 +326,7 @@ function viewPlan(p) {
       <section class="card"><div class="card-head"><div><h2>${finishedToday ? "Tomorrow's session" : "Today's session"}</h2><span class="sub">Day ${finishedToday ? nextDay : day} · ${LEVEL_LABEL[level]} · ${games.length} games</span></div><span class="badge ${level}">${LEVEL_LABEL[level]}</span></div>
         ${finishedToday ? "" : `<div class="progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="${games.length}" aria-valuenow="${doneCount}"><i style="width:${(doneCount / games.length) * 100}%"></i></div>
         <p class="small muted" style="margin:.5rem 0 1rem">${doneCount} of ${games.length} games done today</p>`}
-        <div class="notice privacy" style="margin-bottom:1rem">${icon("camera", 18)}<span><b>Game 1 is Fruit Catcher</b>, a movement game you can play with your hand in front of the camera. <b>The video is never recorded</b> and the camera is optional. <a href="#/privacy">How this works</a></span></div>
+        <div class="notice privacy" style="margin-bottom:1rem">${icon("camera", 18)}<span><b>Games 1 to 3 are movement games</b> (Fruit Catcher, Paint the Path, Feed the Animal). Play them with your hand in front of the camera, a mouse or a finger. <b>The video is never recorded</b> and the camera is optional. <a href="#/privacy">How this works</a></span></div>
         ${action}
         <ol class="glist">${games.map((g, i) => `<li class="grow area-${slug(g.skill)} ${doneIds.has(g.id) ? "done" : i === doneCount && st !== "done_today" ? "next" : ""}"><span class="rank">${doneIds.has(g.id) ? icon("check", 16) : g.difficulty}</span><div><div class="g-title">${esc(g.title)}${focusSet.has(domainOf(g.skill)) ? ` <em class="tag focus">focus</em>` : ""}</div><div class="g-sub">${esc(g.skill)} · ${esc(g.task)}</div></div>${chip(g.skill, true)}</li>`).join("")}</ol>
       </section>
@@ -324,6 +335,9 @@ function viewPlan(p) {
           ${scores.length ? `<ul class="skillbars">${scores.map((s) => `<li class="area-${areaSlug(s.area)} ${focusSet.has(s.area) ? "weak" : ""}"><div class="s-top"><b>${esc(s.area)}</b><span>${s.score}%</span></div><div class="progressbar"><i style="width:${s.score}%"></i></div></li>`).join("")}</ul>` : `<p class="empty">Your skill areas appear after the assessment.</p>`}
           ${focus.length ? `<p class="small muted" style="margin:1rem 0 0">Marked "focus": your lowest areas so far. Their games are tagged in today's list.</p>` : ""}
         </section>
+        ${suggested.length ? `<section class="card" id="suggested"><div class="card-head"><h3>Suggested for you</h3><span class="sub">optional extras</span></div>
+          <ul class="suglist">${suggested.map((s) => `<li class="area-${slug(s.skill)}"><div><b>${esc(s.title)}</b>${chip(s.skill, true)}<p>${esc(s.reason)}</p>${lastExtra(s.id)}</div><a class="btn small" href="#/extra/${esc(s.id)}">${icon("play", 16)}Play</a></li>`).join("")}</ul>
+          <p class="small muted" style="margin:.8rem 0 0">Extras do not change your level. Their results appear in your daily report.</p></section>` : ""}
         <section class="card"><div class="card-head"><h3>Accuracy</h3><a class="small" href="#/reports">All reports</a></div>
           ${trend.length >= 2 ? spark(trend.map((t) => t.v), trend.map((t) => t.l)) : `<p class="empty">${trend.length ? "After Day 1 you will see how your accuracy changes from the assessment." : "Your accuracy chart appears after the assessment."}</p>`}
         </section>
@@ -340,17 +354,36 @@ function viewPlan(p) {
   const k = $("#skip"); if (k) k.onclick = () => { S.skipToNextDay(); route(); };
 }
 
+// ------------------------------------------------------- suggested games
+// An optional extra beside the 10 games, offered on the plan page. It is played like any other game, scored,
+// saved in the player's list and in that day's report, and it never changes the level.
+function viewExtra(p, id) {
+  const hit = L.suggestionsFor(p).find((s) => s.id === id);       // only a game that is suggested to this player
+  if (!hit) return nav("#/plan");
+  let played = false;
+  runSet(p, {
+    games: [hit.game], label: "Suggested game", isTest: false, showScore: true, finishLabel: "Back to the plan",
+    index: () => (played ? 1 : 0),
+    stepFor: (trials) => L.sessionStep(p.level || "easy", trials.length),
+    record: (g, trials) => { L.recordExtra(p, hit.game.id.split("-x-")[1], trials, S.today()); played = true; return null; },
+    afterLast: () => "#/plan",
+  });
+}
+
 // ------------------------------------------------------------------ privacy
 function viewPrivacy(p) {
   const back = p ? `<a class="btn quiet" href="${canonical(p)}">${icon("arrow", 18)}Back</a>` : `<a class="btn quiet" href="#/login">${icon("arrow", 18)}Back to sign in</a>`;
   setMain(`<div class="page"><div class="wrap narrow reveal">
     <div class="page-head"><div><div class="eyebrow">Privacy</div><h1>The camera is never recorded</h1>
-      <p class="lede">Fruit Catcher, game 1 of every daily session, can follow your hand with the camera. This is exactly what happens to the picture.</p></div></div>
+      <p class="lede">Fruit Catcher, Paint the Path and Feed the Animal (games 1 to 3 of every daily session), and the suggested games Cut the Fruit and Make a Face, can use the camera: your hand for the first four and your face for Make a Face. This is exactly what happens to the picture.</p></div></div>
     <div class="card prose">
       <div class="privrow"><span class="ic-wrap">${icon("lock", 20)}</span><div><b>No recording, ever</b><p>The page never saves video, photos or audio. There is no recording code in it, and the microphone is never asked for.</p></div></div>
       <div class="privrow"><span class="ic-wrap">${icon("shield", 20)}</span><div><b>Nothing leaves your device</b><p>The hand-finding model runs inside your browser, from files stored with this site. The camera picture is never uploaded, not even to the cloud project if you switched on cloud storage. Only your game scores are saved.</p></div></div>
       <div class="privrow"><span class="ic-wrap">${icon("camera", 20)}</span><div><b>What is read from the picture</b><p>Only one number per moment: whether your hand is on the left, in the middle or on the right. That decides which lane the character moves to. The picture is dropped right after.</p></div></div>
-      <div class="privrow"><span class="ic-wrap">${icon("check", 20)}</span><div><b>You are in control</b><p>The camera is optional: the arrow keys, a mouse or a finger work just as well. A "Turn camera off" button sits on the preview, and the camera switches off by itself when the game ends or you leave the page. Your browser's camera light shows whenever it is on.</p></div></div>
+      <div class="privrow"><span class="ic-wrap">${icon("check", 20)}</span><div><b>You are in control</b><p>The camera is only asked for after you press "Start with camera". "Play without camera" works just as well, and so do the arrow keys, a mouse or a finger. A "Turn camera off" button sits on the preview, and the camera switches off by itself when the round ends or you leave the page. Your browser's camera light shows whenever it is on.</p></div></div>
+      <div class="privrow"><span class="ic-wrap">${icon("doc", 20)}</span><div><b>What the camera did on this visit</b><p>Only the names of events, never any picture.</p>
+        ${cameraLog.length ? `<ul class="plain">${cameraLog.slice(-8).map((e) => `<li>${esc(new Date(e.at).toLocaleTimeString())} · ${esc(e.event)}</li>`).join("")}</ul>` : `<p class="small muted">The camera has not been used on this visit.</p>`}</div></div>
+      <div class="privrow"><span class="ic-wrap">${icon("info", 20)}</span><div><b>What this page cannot promise</b><p>It describes how this site is built: there is no recording or upload code for the camera. It cannot stop a browser extension, the operating system or another device from recording. To check for yourself, open the browser's developer tools, choose Network, start a camera game and watch: no picture or video is sent. Camera permission can be changed from the lock icon next to the address.</p></div></div>
       <p class="small muted">Account details and scores stay in this browser${Cloud.enabled ? ", and are also saved to your own cloud project" : " unless cloud storage is switched on"}. Reports describe performance in the games and are not a medical assessment.</p>
       <div class="actions">${back}</div>
     </div></div></div>`);

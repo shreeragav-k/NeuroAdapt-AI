@@ -98,6 +98,16 @@ export function progressHtml(pr, { heading = "h2" } = {}) {
   <p class="small muted">This shows how you do in these games. Practice with a game can raise your score in that game, and these games are not a clinical test, so it is a trend to watch and not proof of a medical benefit.</p>`;
 }
 
+// Suggested games played that day. They are scored but are not part of the 10 games or the level decision.
+function extrasHtml(r) {
+  if (!r.extras || !r.extras.length) return "";
+  return `<h2>Suggested games played today</h2>
+  <p class="prose-p">Extras picked for ${esc(r.name)} from the lowest skill areas or the condition given at sign-up. They are scored, but they are not one of the 10 games and do not change the level.</p>
+  <div class="tablewrap"><table><thead><tr><th>Game</th><th>Skill</th><th>Right</th><th>Accuracy</th></tr></thead><tbody>
+  ${r.extras.map((e) => `<tr><td><b>${esc(e.title)}</b></td><td>${esc(e.skill)}</td><td>${e.correct} of ${e.rounds}</td><td>${e.accuracy}% ${bar(e.accuracy)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+}
+
 function dailyCharts(r) {
   const pts = [...(r.baseline ? [{ label: "Assessment", sub: "start", value: r.baseline.accuracy }] : []), ...r.history.map((h) => ({ label: `Day ${h.day}`, sub: LEVEL_LABEL[h.level], value: h.accuracy }))];
   const line = `<h2>Accuracy before and after</h2>
@@ -167,6 +177,7 @@ export function dailyReport(r) {
   </tbody></table></div>
   <p class="small muted">"Before" is the last session played at the same level. ${r.previousSameLevel ? "" : "There is none yet, because these games are new at this level."}</p>
   ${dailyCharts(r)}
+  ${extrasHtml(r)}
   ${progressHtml(r.progress)}
   <h2>Level decision</h2>
   <div class="callout ${down ? "warm" : ""}"><b>${up ? "Moving up to " + LEVEL_LABEL[r.nextLevel] : down ? "Moving down to " + LEVEL_LABEL[r.nextLevel] : "Staying at " + LEVEL_LABEL[r.nextLevel]}.</b> ${esc(r.decision.reason)}</div>

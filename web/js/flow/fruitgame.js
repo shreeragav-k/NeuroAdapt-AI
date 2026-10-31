@@ -3,6 +3,7 @@
 // (left, middle or right third of the field). The rules are in fruitcatcher.js.
 import { Round, DURATIONS, LAYOUT, STEP, LIVES, laneFromX, laneFromPointer } from "./fruitcatcher.js";
 import { startHandTracking } from "./handtrack.js";
+import { createCamera, cameraSupported } from "./camera.js";
 import { icon } from "./icons.js";
 
 const IMG = "/img/fruit/";
@@ -37,11 +38,11 @@ const FRUIT_COLOURS = ["#c0463a", "#9c2f4a", "#4f8a4b", "#d8932f"];
 // Options: `session` = { duration, baseSpeed, lives } plays ONE scored round with those settings and then offers
 // "Continue" (`onContinue(trials, summary)`), which is how the game appears in the daily list of ten.
 // Without it, the game is free play: pick a round length and play as often as you like.
-export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () => {}, session = null, useCamera = true } = {}) {
+export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () => {}, session = null, useCamera = true, tracker = startHandTracking } = {}) {
   host.innerHTML = `<div class="fc" data-state="ready">
     <div class="fc-hud">
       <div><span class="fc-lab">Score</span><span class="fc-score" id="fc-score">0</span></div>
-      <div class="fc-time"><span><b id="fc-secs">${session ? session.duration : 60}</b> <span class="fc-unit">seconds</span></span><span class="fc-bar" aria-hidden="true"><i id="fc-barfill"></i></span></div>
+      <div class="fc-time"><span><b id="fc-secs">${session && session.rounds ? 1 : session ? session.duration : 60}</b> <span class="fc-unit" id="fc-unit">${session && session.rounds ? `of ${session.rounds} rounds` : "seconds"}</span></span><span class="fc-bar" aria-hidden="true"><i id="fc-barfill"></i></span></div>
       <div class="fc-livesbox"><span class="fc-lab">Lives</span><span class="fc-lives" id="fc-lives" role="img" aria-label="${LIVES} lives left">${Array.from({ length: LIVES }, () => "<i></i>").join("")}</span></div>
     </div>
     <div class="fc-stage">
@@ -54,7 +55,7 @@ export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () =>
   </div>`;
   const $ = (id) => host.querySelector(`#${id}`);
   const root = host.querySelector(".fc"), canvas = $("fc-canvas"), ctx = canvas.getContext("2d");
-  const state = { phase: "ready", duration: session ? session.duration : 60, round: null, tracker: null, camNote: useCamera ? "Starting the camera…" : "The camera is off. Use the arrow keys or tap the field.", manual: null, hand: null, popups: [], acc: 0, last: 0, raf: 0, rounds: 0, dead: false, starting: false };
+  const state = { phase: "ready", duration: session ? session.duration : 60, round: null, camNote: "", manual: null, hand: null, popups: [], acc: 0, last: 0, raf: 0, rounds: 0, dead: false, starting: false };
   const imgs = ASSETS;
   ensureAssets();
 
@@ -63,21 +64,21 @@ export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () =>
   const overlay = (html) => { const o = $("fc-overlay"); o.innerHTML = html; o.hidden = !html; const b = o.querySelector("button.btn"); if (b) b.focus({ preventScroll: true }); };
   function readyCard() {
     setPhase("ready");
+    const canCam = useCamera && cameraSupported();
     overlay(`<div class="fc-card">
       <div class="eyebrow">Movement game</div><h2>Fruit Catcher</h2>
       <p>Catch the fruit and let the chocolate fall past. A chocolate costs a life, and the middle lane is always safe.</p>
-      ${session ? `<p class="fc-fixed"><b>${session.duration} seconds</b> · ${session.lives} lives · one scored round</p>` : `<div class="seg" role="group" aria-label="Round length">${DURATIONS.map((d) => `<button type="button" data-d="${d}" aria-pressed="${d === state.duration}" ${d === state.duration ? 'aria-selected="true"' : ""}>${d} s</button>`).join("")}</div>`}
-      <button class="btn lg" id="fc-start" type="button">${icon("play", 18)}Start</button>
-      <p class="fc-note" id="fc-note" role="status">${state.camNote}</p>
-      ${useCamera && !(state.tracker && state.tracker.ok) && !state.starting ? `<button class="linkbtn fc-retry" id="fc-retry" type="button">Try the camera again</button>` : ""}
+      ${session ? `<p class="fc-fixed"><b>${session.rounds} rounds</b> · ${session.lives} lives · a fruit and a chocolate fall each round</p>` : `<div class="seg" role="group" aria-label="Round length">${DURATIONS.map((d) => `<button type="button" data-d="${d}" aria-pressed="${d === state.duration}" ${d === state.duration ? 'aria-selected="true"' : ""}>${d} s</button>`).join("")}</div>`}
+      <div class="fc-choices">${canCam ? `<button class="btn lg" data-go="cam" type="button">${icon("camera", 18)}Start with camera</button><button class="btn quiet" data-go="plain" type="button">Play without camera</button>` : `<button class="btn lg" data-go="plain" type="button">${icon("play", 18)}Start</button>`}</div>
+      <p class="fc-note" id="fc-note" role="status">${canCam ? "Camera: your hand is followed on this device and the video is never recorded. You can also use the arrow keys or tap the field." : "Use the arrow keys or tap the field."}</p>
+      <p class="fc-note"><a href="#/privacy">Learn about camera privacy</a></p>
       ${session ? "" : `<p class="fc-best">Best score: ${readBest()}</p>`}</div>`);
     host.querySelectorAll(".fc-card .seg button").forEach((b) => (b.onclick = () => { state.duration = Number(b.dataset.d); host.querySelectorAll(".fc-card .seg button").forEach((x) => { const on = x === b; x.setAttribute("aria-pressed", on); on ? x.setAttribute("aria-selected", "true") : x.removeAttribute("aria-selected"); }); }));
-    $("fc-start").onclick = start;
-    const retry = $("fc-retry"); if (retry) retry.onclick = () => { startCamera(); readyCard(); };
+    host.querySelectorAll(".fc-card [data-go]").forEach((b) => (b.onclick = () => { if (b.dataset.go === "cam") cam.enable(); start(); }));   // the camera is only asked for here
   }
   function resultCard(s, isBest) {
     setPhase("over");
-    const title = s.ended === "TIME_UP" ? "Time's up" : "No lives left";
+    const title = s.ended === "ROUNDS_DONE" ? "All rounds done" : s.ended === "TIME_UP" ? "Time's up" : "No lives left";
     if (session) {
       const total = s.caught + s.hit + s.missed, acc = total ? Math.round((100 * s.caught) / total) : 0;
       overlay(`<div class="fc-card"><div class="eyebrow">Round finished</div><h2>${title}</h2>
@@ -92,16 +93,17 @@ export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () =>
       <div class="fc-big"><span>${s.score}</span><small>fruit caught</small></div>
       <p class="fc-note">Best: ${readBest()} · Chocolates hit: ${s.hit} · Fruit missed: ${s.missed}</p>
       <button class="btn lg" id="fc-again" type="button">${icon("play", 18)}Play again</button></div>`);
-    $("fc-again").onclick = start;
+    $("fc-again").onclick = readyCard;      // asks about the camera again
   }
 
   // ------------------------------------------------------------ rounds
   function start() {
-    state.round = new Round(state.duration, Math.random, LAYOUT, session ? { baseSpeed: session.baseSpeed, lives: session.lives, speedUp: session.speedUp } : {}); state.popups = []; state.acc = 0; state.manual = null;
+    state.round = new Round(state.duration, Math.random, LAYOUT, session ? { baseSpeed: session.baseSpeed, lives: session.lives, speedUp: session.speedUp, rounds: session.rounds } : {}); state.popups = []; state.acc = 0; state.manual = null;
     setPhase("play"); overlay(""); canvas.focus({ preventScroll: true }); hud();
   }
   function finish() {
-    const r = state.round, s = { ...r.summary(), camera: !!(state.tracker && state.tracker.ok) };
+    const r = state.round, s = { ...r.summary(), camera: cam.on };
+    cam.disable("round finished");
     const isBest = s.score > readBest(); if (isBest) writeBest(s.score);
     state.rounds += 1; onRound(s); resultCard(s, isBest);
   }
@@ -112,7 +114,7 @@ export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () =>
     state.raf = requestAnimationFrame(frame);
     const dt = Math.min(0.1, (ts - state.last) / 1000); state.last = ts;
     if (state.phase === "play" && !document.hidden) {
-      const r = state.round, hx = state.tracker && state.tracker.ok ? state.tracker.read() : null;
+      const r = state.round, hx = cam.on ? cam.read() : null;
       state.hand = hx === null || hx === undefined ? null : laneFromX(hx);
       state.acc += dt;
       while (state.acc >= STEP && !r.over) {
@@ -130,8 +132,12 @@ export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () =>
 
   function hud() {
     const r = state.round; if (!r) return;
-    $("fc-score").textContent = r.score; $("fc-secs").textContent = r.remaining;
-    $("fc-barfill").style.width = `${(100 * r.remaining) / r.duration}%`; $("fc-barfill").classList.toggle("low", r.remaining <= 5);
+    $("fc-score").textContent = r.score;
+    if (session && session.rounds) {                                           // the daily game counts rounds, not seconds
+      const done = Math.min(r.outcomes.length, session.rounds);
+      $("fc-secs").textContent = Math.min(done + 1, session.rounds); $("fc-unit").textContent = `of ${session.rounds} rounds`;
+      $("fc-barfill").style.width = `${(100 * done) / session.rounds}%`;
+    } else { $("fc-secs").textContent = r.remaining; $("fc-barfill").style.width = `${(100 * r.remaining) / r.duration}%`; $("fc-barfill").classList.toggle("low", r.remaining <= 5); }
     const lives = $("fc-lives"); [...lives.children].forEach((el, i) => el.classList.toggle("lost", i >= r.lives)); lives.setAttribute("aria-label", `${r.lives} lives left`);
     [...$("fc-lanes").children].forEach((el, i) => el.classList.toggle("on", i === r.lane));
   }
@@ -172,37 +178,24 @@ export function mountFruitCatcher(host, { onRound = () => {}, onContinue = () =>
   canvas.addEventListener("pointerdown", pointer); canvas.addEventListener("pointermove", (e) => { if (e.buttons || e.pointerType === "touch") pointer(e); });
   canvas.style.touchAction = "none";
 
-  // ------------------------------------------------------------ camera
-  async function startCamera() {
-    if (!useCamera) return;
-    const note = (t) => { state.camNote = t; const n = $("fc-note"); if (n) n.textContent = t; };
-    if (state.starting) return;
-    state.starting = true;
-    const t = await startHandTracking($("fc-video"), { onStatus: note, onPreview: () => { if (!state.dead) $("fc-cam").hidden = false; }, cancelled: () => state.dead });
-    state.starting = false;
-    if (state.dead) { t.ok && t.stop(); return; }
-    if (t.ok) {
-      state.tracker = t; $("fc-cam").hidden = false; note("Hand tracking is ready. Hold your hand up in front of the camera. Nothing is recorded.");
-    } else { $("fc-cam").hidden = true; note(t.reason); if (state.phase === "ready") readyCard(); }
-  }
-
-  $("fc-camoff").onclick = () => {
-    if (state.tracker && state.tracker.ok) state.tracker.stop();
-    state.tracker = null; $("fc-cam").hidden = true; state.hand = null;
-    state.camNote = "The camera is off. Use the arrow keys or tap the field."; const n = $("fc-note"); if (n) n.textContent = state.camNote;
-  };
+  // ------------------------------------------------------------ camera (only after the player chooses it)
+  const cam = createCamera({
+    panel: { box: $("fc-cam"), video: $("fc-video") }, tracker,
+    onNote: (t) => { state.camNote = t; const n = $("fc-note"); if (n) n.textContent = t; },
+  });
+  $("fc-camoff").onclick = () => { cam.disable("player turned the camera off"); state.hand = null; state.camNote = "The camera is off. Use the arrow keys or tap the field."; const n = $("fc-note"); if (n) n.textContent = state.camNote; };
 
   readyCard(); draw();
   state.raf = requestAnimationFrame((ts) => { state.last = ts; state.raf = requestAnimationFrame(frame); });
-  startCamera();
 
   return {
     get rounds() { return state.rounds; },
-    get tracking() { return !!(state.tracker && state.tracker.ok); },
+    get tracking() { return cam.on; },
+    get cam() { return cam; },
     get state() { return state; },
     destroy() {
       state.dead = true; cancelAnimationFrame(state.raf); window.removeEventListener("keydown", onKey);
-      if (state.tracker && state.tracker.ok) state.tracker.stop();
+      cam.destroy();
       host.replaceChildren();
     },
   };

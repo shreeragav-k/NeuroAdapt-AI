@@ -10,6 +10,10 @@ import {
   GROUPS, WORD_LISTS, FOILS, OPPOSITES, LOOKALIKE_DIGITS, NAMES, GREEK, SYLLOGISMS, STORIES, ANALOGIES,
 } from "./data.js";
 import { sessionPlay } from "./fruitcatcher.js";
+import { LEVEL_SHAPES, SHAPES, secondsFor, toleranceFor } from "./tracepath.js";
+import { SEQUENCES, FEED_PLAY } from "./feedanimal.js";
+import { faceSettings } from "./expressions.js";
+import { sliceSettings } from "./slicerules.js";
 import { pictureSvg, ANIMALS, FRUITS, VEHICLES, THINGS, ALL_PICTURES, PICTURE_SETS } from "./art.js";
 
 // -------------------------------------------------------------- small helpers
@@ -660,7 +664,6 @@ E.gonogo = ({ tier, rng, content }) => {
   };
   const prompts = { animals: "Tap the CAT. Wait for any other animal.", vehicles: "Tap the BUS. Wait for the other vehicles.", letter: "Tap every letter, but NOT the X.", digit: "Tap EVEN numbers only.", wordcategory: "Tap ANIMAL words only." };
   return {
-    rounds: { session: 12 },
     trial(i, s) {
       const b = Math.floor(i / 3);
       if (!blocks[b]) blocks[b] = shuffle(rng, [true, true, false]);
@@ -707,8 +710,40 @@ E.fruit = ({ tier, mode }) => ({
   trial() {
     const level = String(mode).split("-")[1];
     if (!["easy", "medium", "hard"].includes(level)) throw new Error("fruit: " + mode);
-    return { kind: "movement", level, ...sessionPlay(level, tier) };
+    return { kind: "movement", game: "fruit", level, tier, ...sessionPlay(level, tier) };
   },
+});
+
+// Paint the Path and Feed the Animal are movement games too: their own players (paintgame.js, feedgame.js)
+// score them, so the trial only tells the screen which round to play.
+const levelOf = (mode) => {
+  const level = String(mode).split("-")[1];
+  if (!["easy", "medium", "hard"].includes(level)) throw new Error("movement game: " + mode);
+  return level;
+};
+E.trace = ({ tier, mode }) => ({
+  rounds: { test: 1, session: 1 },
+  trial() {
+    const level = levelOf(mode), shapes = LEVEL_SHAPES[level];
+    return { kind: "movement", game: "trace", level, tier, shapes: [...shapes], seconds: secondsFor(level, tier), tolerances: shapes.map((s) => toleranceFor(s, tier)), titles: shapes.map((s) => SHAPES[s].title) };
+  },
+});
+E.feed = ({ tier, mode }) => ({
+  rounds: { test: 1, session: 1 },
+  trial() {
+    const level = levelOf(mode);
+    return { kind: "movement", game: "feed", level, tier, sequence: [...SEQUENCES[level]], ...FEED_PLAY[level] };
+  },
+});
+
+// The two suggested games (Make a Face, Cut the Fruit) are movement games with their own players too.
+E.face = ({ tier, mode }) => ({
+  rounds: { test: 1, session: 1 },
+  trial() { const level = levelOf(mode); return { kind: "movement", game: "face", level, tier, ...faceSettings(level, tier) }; },
+});
+E.slice = ({ tier, mode }) => ({
+  rounds: { test: 1, session: 1 },
+  trial() { const level = levelOf(mode); return { kind: "movement", game: "slice", level, tier, ...sliceSettings(level, tier) }; },
 });
 
 // -------------------------------------------------------------------- public

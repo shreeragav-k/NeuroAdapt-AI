@@ -63,6 +63,27 @@ async function openCamera(onStatus) {
   throw err;
 }
 
+// Opens the camera for another tracker (the face tracker) with the same care: one stream at a time, a busy camera
+// is retried, and the stream is stopped if the player has already left. -> { ok: true, stop() } | { ok: false, reason }
+export async function acquireStream(video, { onStatus = () => {}, cancelled = () => false } = {}) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return { ok: false, reason: "This browser cannot use a camera here. Use the mouse or a finger." };
+  releaseCamera();
+  let stream;
+  try { onStatus("Asking for the camera…"); stream = await openCamera(onStatus); } catch (e) {
+    const name = e && e.name;
+    return { ok: false, reason: name === "NotAllowedError" || name === "SecurityError" ? "The camera is blocked. Allow it in the browser, or play without the camera."
+      : name === "NotReadableError" || name === "AbortError" || name === "TrackStartError" ? "The camera is busy. Close other apps or tabs that use it, then try again."
+      : "No camera was found. Play without the camera." };
+  }
+  activeStream = stream;
+  const stop = () => { stream.getTracks().forEach((t) => t.stop()); if (activeStream === stream) activeStream = null; video.srcObject = null; };
+  if (cancelled()) { stop(); return { ok: false, reason: "cancelled" }; }
+  video.muted = true; video.playsInline = true; video.srcObject = stream;
+  try { await video.play(); } catch { /* the picture still arrives */ }
+  if (cancelled()) { stop(); return { ok: false, reason: "cancelled" }; }
+  return { ok: true, stop };
+}
+
 export async function startHandTracking(video, { onStatus = () => {}, onPreview = () => {}, cancelled = () => false } = {}) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     return { ok: false, reason: "This browser cannot use a camera here. Use the arrow keys or tap the screen." };
@@ -90,21 +111,23 @@ export async function startHandTracking(video, { onStatus = () => {}, onPreview 
     onStatus(landmarker ? "Starting hand tracking…" : "Loading hand tracking. You can start now with the arrow keys; your hand takes over when it is ready.");
     const lm = await loadModel();
     if (cancelled()) { stopStream(); video.srcObject = null; return { ok: false, reason: "cancelled" }; }
-    let lastTime = -1, lastX = null, lastAt = 0, fails = 0;
+    let lastTime = -1, lastFrame = null, lastAt = 0, fails = 0;
+    // Looks at the camera picture about 30 times a second. All it keeps is a handful of numbers about the hand
+    // (never the picture): the wrist, the index fingertip, and how far thumb and index are apart.
+    const look = () => {
+      const now = performance.now();
+      if (video.readyState < 2 || video.currentTime === lastTime || now - lastAt < 33) return;
+      lastTime = video.currentTime; lastAt = now;
+      try {
+        const res = lm.detectForVideo(video, now), h = res.landmarks && res.landmarks[0];
+        lastFrame = h ? { wristX: 1 - h[0].x, x: 1 - h[8].x, y: h[8].y, pinch: Math.hypot(h[4].x - h[8].x, h[4].y - h[8].y) } : null;   // mirrored for the player
+        fails = 0;
+      } catch { lastFrame = null; if (++fails > 30) { dropModel(); fails = 0; } }   // a model that keeps failing is rebuilt next game
+    };
     return {
       ok: true,
-      read() {
-        const now = performance.now();
-        if (video.readyState < 2 || video.currentTime === lastTime || now - lastAt < 33) return lastX;   // about 30 checks a second is plenty
-        lastTime = video.currentTime; lastAt = now;
-        try {
-          const res = lm.detectForVideo(video, now);
-          const w = res.landmarks && res.landmarks[0] && res.landmarks[0][0];
-          lastX = w ? 1 - w.x : null;                                    // the picture is mirrored for the player
-          fails = 0;
-        } catch { lastX = null; if (++fails > 30) { dropModel(); fails = 0; } }   // a model that keeps failing is rebuilt next game
-        return lastX;
-      },
+      read() { look(); return lastFrame ? lastFrame.wristX : null; },     // wrist x, 0 left .. 1 right (Fruit Catcher)
+      frame() { look(); return lastFrame; },                              // { wristX, x, y, pinch } or null (the other games)
       stop() { stopStream(); video.srcObject = null; },
     };
   } catch (e) {

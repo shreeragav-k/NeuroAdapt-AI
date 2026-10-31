@@ -2,9 +2,18 @@
 import { dayKey, shiftDays } from "./logic.js";
 
 const KEY = "neuroadapt:flow:v1";
+// Bumping this value wipes every account and result saved in a browser, once, the next time the site opens there.
+// (It is how "reset all accounts" works for browsers the developer cannot reach.)
+export const RESET_EPOCH = "2026-10-31-reset-all-accounts";
+const EPOCH_KEY = "neuroadapt:flow:epoch", OLD_KEYS = ["neuroadapt:fruit:best"];
 export const state = { profiles: {}, accounts: {}, activeKey: null, dayOffset: 0 };   // accounts: local sign-in records (only used without Firebase)
 
 export function load() {
+  try {
+    if (localStorage.getItem(EPOCH_KEY) !== RESET_EPOCH) {                 // a reset was ordered: start clean
+      localStorage.removeItem(KEY); OLD_KEYS.forEach((k) => localStorage.removeItem(k)); localStorage.setItem(EPOCH_KEY, RESET_EPOCH);
+    }
+  } catch { /* storage blocked: nothing to reset */ }
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
     if (raw && typeof raw === "object") {

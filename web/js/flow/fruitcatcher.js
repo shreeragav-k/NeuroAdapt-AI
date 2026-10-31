@@ -21,9 +21,10 @@ export const SESSION_PLAY = Object.freeze({
   hard: Object.freeze({ duration: 60, baseSpeed: 6 }),
 });
 export const SESSION_SPEED_UP = Object.freeze({ every: 5, max: 2 });
+export const SESSION_ROUNDS = 3;          // a round is one fall (a fruit and a chocolate); the daily game is 3 of them
 export const sessionPlay = (level, tier) => {
   const p = SESSION_PLAY[level];
-  return { duration: p.duration, baseSpeed: p.baseSpeed - (tier === 0 ? 1 : 0), lives: LIVES, speedUp: SESSION_SPEED_UP };
+  return { duration: p.duration, baseSpeed: p.baseSpeed - (tier === 0 ? 1 : 0), lives: LIVES, speedUp: SESSION_SPEED_UP, rounds: SESSION_ROUNDS };
 };
 
 export const LAYOUT = Object.freeze({
@@ -39,7 +40,8 @@ export const laneFromX = (x) => (x < 0.4 ? 0 : x > 0.6 ? 2 : 1);
 export const laneFromPointer = (fx) => (fx < 1 / 3 ? 0 : fx > 2 / 3 ? 2 : 1);
 
 export class Round {
-  constructor(duration = 60, rng = Math.random, layout = LAYOUT, { baseSpeed = BASE_FALL_SPEED, lives = LIVES, speedUp = { every: 3, max: MAX_SPEED_BONUS } } = {}) {
+  constructor(duration = 60, rng = Math.random, layout = LAYOUT, { baseSpeed = BASE_FALL_SPEED, lives = LIVES, speedUp = { every: 3, max: MAX_SPEED_BONUS }, rounds = null } = {}) {
+    this.maxFalls = rounds;                 // null = play until time or lives run out
     this.duration = duration; this.rng = rng; this.layout = layout; this.baseSpeed = baseSpeed; this.speedUp = speedUp;
     this.outcomes = [];                     // one entry per fall: "caught" | "missed" | "hit" (a chocolate that was touched)
     this.lives = lives; this.caught = 0; this.hit = 0; this.missed = 0;
@@ -82,7 +84,8 @@ export class Round {
     if (this.touching(this.choc)) { this.lives -= 1; this.hit += 1; this.outcomes.push("hit"); events.push({ type: "hit", x: L.laneX[this.choc.lane], y: this.choc.y }); respawn = true; }
     if (!respawn && this.fruit.y > L.height) { this.missed += 1; this.outcomes.push("missed"); events.push({ type: "missed", x: L.laneX[this.fruit.lane], y: L.height - 60 }); respawn = true; }
     if (respawn) [this.fruit, this.choc] = this.spawn();
-    if (this.remaining <= 0) this.over = "TIME_UP";
+    if (this.maxFalls && this.outcomes.length >= this.maxFalls) this.over = "ROUNDS_DONE";
+    else if (this.remaining <= 0) this.over = "TIME_UP";
     else if (this.lives <= 0) this.over = "OUT_OF_LIVES";
     return events;
   }

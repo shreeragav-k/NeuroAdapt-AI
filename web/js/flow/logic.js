@@ -8,7 +8,7 @@
 // A profile is a plain object. Every function that changes a profile either
 // throws when the workflow would be broken or leaves the profile consistent.
 
-import { GROUPS, LEVELS, LEVEL_LABEL, RULES, BANDS, CATALOG, DOMAINS, domainOf } from "./data.js";
+import { GROUPS, LEVELS, LEVEL_LABEL, RULES, BANDS, CATALOG, DOMAINS, domainOf, SUGGESTIONS, suggestionById, TASK_INFO } from "./data.js";
 
 // ------------------------------------------------------------------- groups
 export function groupForAge(age) {
@@ -129,6 +129,43 @@ export function focusAreas(p, n = 2) {
   return Object.entries(scores).filter(([, v]) => v < RULES.promoteAt).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).slice(0, n).map(([area, score]) => ({ area, score }));
 }
 
+// ------------------------------------------------------------ suggested games
+// A suggested game is an optional extra beside the 10 games of the level. It is offered when
+//   - one of the player's lowest skill areas (latest report, below the promotion line) is one the game trains, or
+//   - the health condition they gave at sign-up contains a word that points to it.
+// It never changes the level: its score is kept and shown in the report, and that is all.
+export const suggestionGame = (def, groupId, level) => ({
+  id: `${groupId}-x-${def.id}`, group: groupId, phase: "suggested", order: 0, difficulty: null,
+  engine: def.engine, content: def.content, mode: `${groupId}-${level}`, title: def.title, skill: def.skill, how: def.how,
+  task: TASK_INFO[def.engine][0], trains: TASK_INFO[def.engine][1],
+});
+const listWords = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+export function suggestionsFor(p) {
+  if (stageOf(p) !== "learning") return [];
+  const level = p.level || "easy", weak = focusAreas(p, 3).map((f) => f.area), out = [];
+  for (const def of SUGGESTIONS) {
+    const hits = def.areas.filter((a) => weak.includes(a)), byCondition = !!(p.condition && def.condition.test(p.condition));
+    if (!hits.length && !byCondition) continue;
+    const why = [hits.length ? `${listWords(hits)} ${hits.length === 1 ? "is" : "are"} among your lowest skill areas` : "", byCondition ? "of the condition you told us about" : ""].filter(Boolean);
+    const reason = hits.length && byCondition ? `${why[0]}, and it also fits the condition you told us about.` : hits.length ? `${why[0]}, and this game trains ${hits.length === 1 ? "it" : "them"}.` : "It is suggested because of the condition you told us about.";
+    out.push({ id: def.id, title: def.title, skill: def.skill, reason, byArea: hits, byCondition, game: suggestionGame(def, p.groupId, level) });
+  }
+  return out;
+}
+
+// Keep the result of a suggested game. It goes in the player's list and in that day's daily report (if there is one).
+export function recordExtra(p, id, trials, date) {
+  const def = suggestionById(id);
+  if (!def) throw new Error(`Unknown suggested game ${id}.`);
+  if (!trials.length) throw new Error("A game needs at least one round.");
+  const level = p.level || "easy", row = summarizeGame(suggestionGame(def, p.groupId, level), trials);
+  const rec = { id: `x-${(p.extras || []).length + 1}`, date, gameId: def.id, title: def.title, skill: def.skill, level, rounds: row.rounds, correct: row.correct, accuracy: row.accuracy };
+  (p.extras ||= []).push(rec);
+  const day = [...p.reports].reverse().find((r) => r.type === "daily" && r.date === date);
+  if (day) (day.extras ||= []).push(rec);
+  return rec;
+}
+
 // --------------------------------------------------------------- the profile
 // One profile per account. `id` is the account id (Firebase uid, or a local id).
 export function newProfile({ name, age, group, condition, email = "" }, id, now = new Date().toISOString()) {
@@ -141,6 +178,7 @@ export function newProfile({ name, age, group, condition, email = "" }, id, now 
     sessions: [],
     current: null,
     reports: [],
+    extras: [],            // suggested games played: { id, date, gameId, title, skill, level, rounds, correct, accuracy }
   };
 }
 
@@ -285,6 +323,7 @@ function finishSession(p) {
     history: [...p.sessions, session].map((s) => ({ day: s.n, date: s.date, level: s.level, accuracy: s.accuracy })),
     nextLevel: decision.newLevel,
     nextPlan: levelGames(p.groupId, decision.newLevel).map(({ id, title, skill }) => ({ id, title, skill })),
+    extras: (p.extras || []).filter((e) => e.date === cur.date),       // suggested games already played today
   };
   report.progress = progressFrom(assessment, [...p.reports.filter((r) => r.type === "daily"), report], decision.newLevel);
   p.sessions.push(session);

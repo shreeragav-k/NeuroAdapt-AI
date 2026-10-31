@@ -177,9 +177,9 @@ input[type=email] { width: 100%; }
 @media (max-width: 700px) { .pads.grid6 { grid-template-columns: repeat(6, 3.3rem); } .matrix td { width: 4rem; height: 4rem; } }
 
 /* ---- enhanced games: pictures, study timer, task card, areas, stars */
-:root { --a-memory: #2b6e6a; --a-attention: #b8893a; --a-self-control: #8b5a8c; --a-reasoning: #4a6fa5; --a-flexible-thinking: #5f8a3a; --a-spatial-thinking: #8b5e3c; --a-processing-speed: #c4553d; }
+:root { --a-social-thinking: #9a4e6e; --a-memory: #2b6e6a; --a-attention: #b8893a; --a-self-control: #8b5a8c; --a-reasoning: #4a6fa5; --a-flexible-thinking: #5f8a3a; --a-spatial-thinking: #8b5e3c; --a-processing-speed: #c4553d; }
 .area-memory { --area: var(--a-memory); } .area-attention { --area: var(--a-attention); } .area-self-control { --area: var(--a-self-control); }
-.area-reasoning { --area: var(--a-reasoning); } .area-flexible-thinking { --area: var(--a-flexible-thinking); } .area-spatial-thinking { --area: var(--a-spatial-thinking); } .area-processing-speed { --area: var(--a-processing-speed); }
+.area-reasoning { --area: var(--a-reasoning); } .area-flexible-thinking { --area: var(--a-flexible-thinking); } .area-spatial-thinking { --area: var(--a-spatial-thinking); } .area-processing-speed { --area: var(--a-processing-speed); } .area-social-thinking { --area: var(--a-social-thinking); }
 .play-wrap .play { border-top: 5px solid var(--area, var(--teal)); }
 .play-wrap .eyebrow, .taskcard .eyebrow { color: var(--area, var(--teal)); }
 .pic { display: block; }
