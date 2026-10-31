@@ -1,15 +1,15 @@
 # Halcyon workflow (age-group edition)
 
 The website in `web/` follows one strict path. Run it with `python run.py`, then open http://127.0.0.1:8765/.
-Rules live in `web/js/flow/logic.js`, the 105 games in `web/js/flow/data.js` and `engines.js`, the screens in `web/js/app.js`.
+Rules live in `web/js/flow/logic.js`, the 105 games (Fruit Catcher is game 1 of each of the 9 lists) in `web/js/flow/data.js` and `engines.js`, the screens in `web/js/app.js`.
 
 ```
 Create account / Sign in (name, age, optional condition, email, password)
   -> Assessment: the 5 games of the player's age group
   -> Assessment report  (name, age, group, condition, accuracy per game, overall, ability score, level)
   -> Adaptive learning plan: the 10 games of that level
-  -> Daily session (one per day): those 10 games, in order
-  -> Daily report: today vs. earlier days, level kept / raised / lowered
+  -> Daily session (one per day): those 10 games, in order. Game 1 of every list is the movement game Fruit Catcher
+  -> Daily report: today vs. earlier days (graphs), level kept / raised / lowered, and "Is it working?" progress since the assessment
   -> next day: the 10 games of the (possibly new) level
 ```
 
@@ -65,6 +65,24 @@ Age 18 belongs to g3 so that no age sits in two groups. Change the limits in `GR
 
 Within a set no two games use the same engine, and no engine + content + mode combination is used twice anywhere. `tests/flow.test.mjs` checks this, the difficulty order, and that each game's answer is really right.
 
+## Movement game: Fruit Catcher, game 1 of every list
+Fruit Catcher is **game 1 of the 10** in all nine lists (3 age groups x Easy / Medium / Hard). It replaces the warm-up game that used to open each list, so a list is still 10 games. It is not in the assessment. A fruit and a chocolate fall together; be under the fruit, let the chocolate pass, and the middle lane is always safe.
+
+* **One scored round, set by the level**: Easy 30 s, Medium 45 s, Hard 60 s, three lives; the fall speed is slow enough to follow with a hand in front of a camera: 4 / 5 / 6 pixels a step (240 to 360 px a second), one lower for ages 1 to 5, and +1 after every 5 fruit up to +2 (`sessionPlay` in `fruitcatcher.js`; free play keeps the original 8).
+* **Scoring is the same as every other game.** Each fall is one trial: a fruit caught is right; a fruit missed or a chocolate touched is wrong. Accuracy = right / (right + wrong). The game counts as **Self-control** (response inhibition) in the skill charts, in the "previous vs today" bars and in the level decision.
+* **The one exception to "no game in two sets":** the same game appears in nine lists (one per group and level, each with its own settings). The other 96 list games and the 15 assessment games are still all different. The user asked for this; more movement games can take game 2, 3... later (the catalogue row format and the `movement` trial kind are ready).
+* **Safe to play again and again.** Only one camera stream is open at a time (an earlier one is released first; a busy camera is retried; a "Try the camera again" button appears if it still fails), the hand model is built once and kept (and preloaded while the game card is read, so the heavy start-up is not in the middle of a game), the sprites are loaded once and a plain shape is drawn if one is ever missing.
+* **Text sizes.** Nothing on the screens is smaller than about 13 px: small labels were enlarged (fonts unchanged) and the chart text scales up on phones. A test checks the CSS.
+* **Plays right inside the page.** Nothing to install or start. The camera follows your wrist with MediaPipe's Hand Landmarker running in the browser (files in `web/vendor/mediapipe`, offline). The arrow keys / A S D, a mouse, or a finger on the left, middle or right of the field work too.
+* **Camera privacy (the video is never recorded).** Said on the game card, on the camera preview ("Live - not recorded"), under the game and on the `#/privacy` page (footer link). A "Turn camera off" button sits on the preview, and the camera stops when the round ends or the page changes. A test (`privacy: nothing in the site can record or send camera video`) fails if the code ever uses `MediaRecorder`, `captureStream`, `toBlob`, `toDataURL`, `Blob`, uploads from the camera files, or audio.
+* **Optional PyGame window** (not part of the daily list): `py main.py` starts the site; `cd game/fruit_catcher && py main.py` opens the window alone (`--no-camera` for keys only). The server also keeps `/api/launch`. Its rules are in `game/fruit_catcher/logic.py`; a test checks they match `fruitcatcher.js`. Needs `pip install -r game/requirements.txt`.
+* Tests: `node --test tests/flow.test.mjs` and `cd game && python -m unittest discover -s tests`.
+
+## Reports and "Is it working?"
+Daily report graphs: accuracy over time (assessment, then each day, with the 85% and 50% lines), **each game, previous session vs today** (bars), skill areas (assessment / previous / today) and progress since the assessment (start vs now per skill area).
+
+"Is it working?" (`progressFrom` in `logic.js`) looks at three things, and calls a change real only at 5 points or more: the level (moved up since the assessment?), the **same level over time** (first vs latest session at the level played most, the fairest comparison), and each skill area (assessment vs latest day). Verdicts: too early (one session), improving, steady, mixed, slipping. It appears on the plan page and in every daily report. Wording is honest on purpose: it shows results in these games; practice can raise a game score and this is not a clinical test, so it is a trend and not proof of medical benefit.
+
 ## Assessment and level
 Each assessment game has 6 rounds on a staircase from step 1 to 6, starting at 3: a right answer moves one step up, a wrong one one step down. Game ability = average of the steps played plus the step that would come next. Overall ability = average of the 5 games.
 
@@ -92,6 +110,17 @@ The assessment report shows accuracy per cognitive skill area. Every daily repor
 
 ## Firebase (optional)
 See `FIREBASE.md`. Without a config in `web/js/flow/firebase-config.js` everything stays in the browser.
+
+## Interface
+The web interface (`web/css/ui.css`, `web/js/app.js`, icons in `web/js/flow/icons.js`) is built as a small product shell on the Halcyon look (ivory, serif headings, one teal accent):
+
+* **App bar** with the Halcyon mark, Plan and Reports tabs, a sound switch, the player's initials, name and age group, and Sign out. On a phone the tabs move to their own row.
+* **Journey steps** (Assessment, Report, Day 1, Daily practice) above the main screens, so the player always sees where they are.
+* **Sign in / Create account** as a split page: a calm brand panel on the left, a form with inline age-group hint, show-password buttons and clear errors on the right.
+* **Plan dashboard**: level, day, last accuracy and sessions done; today's session with progress and the ten games in order (area chip, classic task, "focus" tags for the weakest skills); skill-area bars; an accuracy sparkline. After a finished day it shows tomorrow's session.
+* **Game screens**: a segmented progress bar for the set, a task card before every game, the game inside an area-coloured frame, a finish card with stars.
+* **Reports**: cover header, details, KPI strip, tables and charts; a reports list with a trend chart; print layout.
+* Every page sets its own title, works from 360 px wide up, keeps keyboard focus visible and respects reduced motion.
 
 ## Tests
 ```

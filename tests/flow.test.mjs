@@ -8,6 +8,9 @@ import { createAccount, signInAccount } from "../web/js/flow/auth.js";
 import { reportHtml } from "../web/js/flow/report.js";
 import { makeGame, ENGINE_NAMES, _transforms, COLORS } from "../web/js/flow/engines.js";
 import { pictureSvg, ALL_PICTURES } from "../web/js/flow/art.js";
+import { icon, markSvg, ICON_NAMES } from "../web/js/flow/icons.js";
+import { readFileSync, existsSync, statSync } from "node:fs";
+import * as FC from "../web/js/flow/fruitcatcher.js";
 import * as L from "../web/js/flow/logic.js";
 
 const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -27,7 +30,7 @@ test("catalogue: no game appears twice (ids, titles, engine+content+mode)", () =
   const ids = new Set(), titles = new Set(), kinds = new Set();
   for (const g of CATALOG) {
     assert.ok(!ids.has(g.id), "duplicate id " + g.id); ids.add(g.id);
-    const t = g.title.toLowerCase(); assert.ok(!titles.has(t), "duplicate title " + g.title); titles.add(t);
+    const t = g.title.toLowerCase(); if (g.engine !== "fruit") { assert.ok(!titles.has(t), "duplicate title " + g.title); titles.add(t); }   // the movement game is game 1 of every list
     const k = `${g.engine}:${g.content}:${g.mode}`; assert.ok(!kinds.has(k), "same game built twice: " + k); kinds.add(k);
     assert.ok(ENGINE_NAMES.includes(g.engine), "unknown engine " + g.engine);
     assert.ok(g.title && g.skill && g.how, "missing text on " + g.id);
@@ -131,6 +134,7 @@ function checkCustom(d, label) {
     case "timing": assert.ok(d.zone[0] >= 0 && d.zone[1] <= 1 && d.zone[0] < d.zone[1], label); break;
     case "grid": assert.ok(d.lit.length >= 1 && d.lit.every((i) => i < d.size * d.size), label); break;
     case "reaction": assert.ok(d.waitMs > 0 && d.limitMs > 0, label); break;
+    case "movement": assert.ok(d.duration >= 30 && d.baseSpeed > 0 && d.lives === 3, label); break;
     default: assert.fail(`${label}: unknown kind ${d.kind}`);
   }
 }
@@ -155,6 +159,7 @@ test("engines: round counts (6 in the assessment, 8 in practice, special cases)"
     const inst = makeGame(game, mulberry(5));
     const t = inst.rounds(true, defaults), s = inst.rounds(false, defaults);
     if (game.engine === "pairs") { assert.equal(t, 2); assert.equal(s, 2); }
+    else if (game.engine === "fruit") { assert.equal(s, 1); }
     else if (game.engine === "gonogo") { assert.equal(t, 6); assert.equal(s, 12); }
     else { assert.equal(t, 6, game.id); assert.equal(s, 8, game.id); }
   }
@@ -232,7 +237,6 @@ test("answers: route, logic, stroop, flanker, analogies, categories", () => {
   }
   for (const d of sampleGames("stroop", "color")) assert.equal(right(d), d.meta.ink);
   for (const d of sampleGames("stroop", "reverse")) assert.equal(right(d), d.meta.word);
-  for (const c of ["arrows", "letters"]) for (const d of sampleGames("flanker", c)) assert.equal(d.options[d.answer].key, d.meta.c);
   for (const c of ["words", "abstract"]) for (const d of sampleGames("analogy", c, 60)) {
     const e = ANALOGIES[c].find((x) => d.stimulus.includes(x.q.replace(/&/g, "&amp;")));
     assert.ok(e, "analogy not found"); assert.equal(right(d), e.a); assert.equal(d.options.length, 4);
@@ -631,6 +635,177 @@ test("dates", () => {
   assert.equal(L.dayKey(L.shiftDays(new Date(2026, 0, 31), 1)), "2026-02-01");
 });
 
+test("movement game: Fruit Catcher is game 1 of the 10 in every group and level, and nowhere else", () => {
+  for (const g of GROUPS) for (const lv of LEVELS) {
+    const set = L.levelGames(g.id, lv);
+    assert.equal(set.length, 10, `${g.id}/${lv}`);
+    assert.equal(set[0].engine, "fruit", `${g.id}/${lv} game 1`); assert.equal(set[0].title, "Fruit Catcher");
+    assert.equal(set.filter((x) => x.engine === "fruit").length, 1, `${g.id}/${lv} has one movement game`);
+    assert.equal(set[0].mode, `${g.id}-${lv}`); assert.equal(domainOf(set[0].skill), "Self-control");
+  }
+  for (const g of CATALOG.filter((x) => x.phase === "test")) assert.notEqual(g.engine, "fruit", "not in the assessment");
+  assert.equal(CATALOG.filter((x) => x.engine === "fruit").length, 9);
+});
+
+test("movement game: its settings grow with the level and are gentler for ages 1 to 5", () => {
+  const e = FC.sessionPlay("easy", 1), m = FC.sessionPlay("medium", 1), h = FC.sessionPlay("hard", 1);
+  assert.deepEqual([e.duration, m.duration, h.duration], [30, 45, 60]);
+  assert.ok(e.baseSpeed < m.baseSpeed && m.baseSpeed < h.baseSpeed);
+  assert.ok(FC.sessionPlay("easy", 0).baseSpeed < e.baseSpeed);
+  for (const g of CATALOG.filter((x) => x.engine === "fruit")) {
+    const d = makeGame(g, mulberry(1)).trial(0, 3), lv = g.mode.split("-")[1];
+    assert.equal(d.kind, "movement"); assert.equal(d.duration, FC.sessionPlay(lv, GROUPS.find((x) => x.id === g.group).tier).duration);
+  }
+});
+
+test("movement game: a round becomes ordinary game trials (fruit caught = right, missed or chocolate = wrong)", () => {
+  const r = new FC.Round(30, mulberry(3), FC.LAYOUT, { baseSpeed: 10 });
+  r.outcomes.push("caught", "caught", "missed", "hit", "caught");
+  const t = r.trials([3, 4]);
+  assert.deepEqual(t.map((x) => x.correct), [true, true, false, false, true]);
+  assert.deepEqual(t.map((x) => x.step), [3, 4, 3, 4, 3]);
+  assert.equal(L.summarizeGame({ id: "x", title: "T", skill: "Response inhibition" }, t).accuracy, 60);
+  assert.equal(new FC.Round(30).trials().length, 1, "a round with no falls still scores (as one miss)");
+  assert.equal(new FC.Round(30, mulberry(1), FC.LAYOUT, { baseSpeed: 12 }).speed, 12);
+  assert.equal(new FC.Round(30).speed, FC.BASE_FALL_SPEED, "default rules are unchanged");
+});
+
+test("movement game: a real round of play fills the outcomes and they add up", () => {
+  const r = new FC.Round(30, mulberry(11));
+  let n = 0; while (!r.over && n++ < 60 * 40) r.update(FC.STEP, Math.floor(n / 50) % 3);
+  assert.ok(r.outcomes.length > 0);
+  assert.equal(r.outcomes.filter((o) => o === "caught").length, r.caught);
+  assert.equal(r.outcomes.filter((o) => o === "hit").length, r.hit);
+  assert.equal(r.outcomes.filter((o) => o === "missed").length, r.missed);
+});
+
+test("movement game: it is scored like the other nine, in the session and in the report", () => {
+  const p = login("Mov", 20); playTest(p, ALT); L.markAssessmentViewed(p);
+  L.startSession(p, "2026-11-01");
+  const first = L.expectedSessionGame(p); assert.equal(first.engine, "fruit"); assert.equal(first.difficulty, 1);
+  const fruitTrials = [...Array(12).fill(true), ...Array(3).fill(false)].map((c, i) => ({ step: L.sessionStep(p.current.level, i), correct: c, rt: null }));
+  assert.equal(L.recordSessionGame(p, first.id, fruitTrials), null);
+  let r = null; while (p.current) { const g = L.expectedSessionGame(p); r = L.recordSessionGame(p, g.id, Array.from({ length: 8 }, (_, k) => ({ step: 1, correct: k < 6, rt: 1 }))) || r; }
+  assert.equal(r.games.length, 10); assert.equal(r.games[0].title, "Fruit Catcher"); assert.equal(r.games[0].accuracy, 80);
+  assert.equal(r.accuracy, Math.round((80 + 75 * 9) / 10));
+  assert.ok(r.skills.find((k) => k.area === "Self-control"), "Self-control is reported");
+  assert.ok(reportHtml(r).includes("Fruit Catcher"));
+});
+
+test("privacy: nothing in the site can record or send camera video", () => {
+  const read = (f) => readFileSync(new URL("../web/js/" + f, import.meta.url), "utf8");
+  const names = ["app.js", "flow/handtrack.js", "flow/fruitgame.js", "flow/fruitcatcher.js", "flow/cloud.js", "flow/storage.js", "flow/play.js", "flow/report.js"];
+  const files = names.map((f) => [f, read(f)]);
+  const banned = [/MediaRecorder/, /captureStream/, /ImageCapture/, /createObjectURL/, /new\s+Blob/, /toBlob/, /toDataURL/, /getDisplayMedia/, /audio\s*:\s*true/, /indexedDB/, /sendBeacon/, /WebSocket/, /RTCPeerConnection/];
+  for (const [f, src] of files) for (const re of banned) assert.ok(!re.test(src), `${f} must not use ${re}`);
+  // the camera is requested in one place only, without audio, and its tracks are stopped
+  assert.deepEqual(files.filter(([, src]) => /getUserMedia/.test(src)).map(([f]) => f), ["flow/handtrack.js"]);
+  const ht = read("flow/handtrack.js"); assert.match(ht, /audio:\s*false/); assert.match(ht, /getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\)/);
+  // the files that see the video make no requests
+  for (const f of ["flow/handtrack.js", "flow/fruitgame.js"]) assert.ok(!/fetch\(|XMLHttpRequest/.test(read(f)), `${f} must not make requests`);
+  // the Python window never saves frames
+  const tr = readFileSync(new URL("../game/fruit_catcher/tracker.py", import.meta.url), "utf8");
+  assert.ok(!/VideoWriter|imwrite|\.write\(/.test(tr), "tracker.py must not write frames");
+  // the player is told, on the game screen and on a page of its own
+  const fg = read("flow/fruitgame.js"); assert.match(fg, /never recorded/); assert.match(fg, /not recorded/); assert.match(fg, /Turn camera off/);
+  assert.match(read("app.js"), /function viewPrivacy/);
+});
+
+test("progress: 'is it working' compares the assessment with now, level, same-level sessions and skill areas", () => {
+  const p = login("Pro", 30); playTest(p, ALT); L.markAssessmentViewed(p);
+  assert.equal(L.progressSummary(p), null, "nothing before the first daily report");
+  const r1 = playSession(p, 0.6, "2026-12-01");
+  assert.equal(r1.progress.verdict, "early");
+  const r2 = playSession(p, 0.95, "2026-12-02");
+  assert.ok(["improving", "mixed"].includes(r2.progress.verdict), r2.progress.verdict);
+  assert.equal(r2.progress.days, 2); assert.equal(r2.progress.startAccuracy, p.reports[0].overallAccuracy); assert.equal(r2.progress.nowAccuracy, r2.accuracy);
+  assert.deepEqual(L.progressSummary(p), r2.progress, "same numbers on the plan page and in the report");
+  const html = reportHtml(r2);
+  assert.match(html, /Is it working/); assert.match(html, /not proof of a medical benefit/); assert.match(html, /Each game: before and today/);
+  // a clear fall is reported as such
+  const s = login("Down", 30); playTest(s, CORRECT); L.markAssessmentViewed(s);
+  playSession(s, 0.2, "2026-12-01"); const d2 = playSession(s, 0.2, "2026-12-02");
+  assert.equal(d2.progress.verdict, "slipping");
+});
+
+test("privacy page exists and the footer links to it", () => {
+  const app = readFileSync(new URL("../web/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /privacy: viewPrivacy/); assert.match(app, /href="#\/privacy"/);
+  assert.match(app, /if \(name === "privacy"\) return true/);
+});
+
+test("interface: every icon the screens use exists and draws", () => {
+  const src = readFileSync(new URL("../web/js/app.js", import.meta.url), "utf8");
+  const used = [...new Set([...src.matchAll(/icon\("([a-z]+)"/g)].map((m) => m[1]).concat([...src.matchAll(/icon\(Sound\.isMuted\(\) \? "(\w+)" : "(\w+)"/g)].flatMap((m) => [m[1], m[2]])))];
+  assert.ok(used.length >= 12, "the screens use icons");
+  for (const n of used) assert.ok(ICON_NAMES.includes(n), `app.js uses an icon that does not exist: ${n}`);
+  for (const n of ICON_NAMES) assert.match(icon(n, 20), /^<svg class="ic /);
+  assert.throws(() => icon("nope")); assert.match(markSvg(30), /<svg class="mark"/);
+});
+
+test("interface: the screens never reuse a class name from the game player (those clashes broke the layout once)", () => {
+  const ui = readFileSync(new URL("../web/css/ui.css", import.meta.url), "utf8"), flow = readFileSync(new URL("../web/css/flow.css", import.meta.url), "utf8");
+  const defined = (css) => new Set([...css.matchAll(/(?:^|[\s,}])\.([a-z][\w-]*)/gm)].map((m) => m[1]));
+  const game = ["field", "opt", "pad", "target", "stage", "prompt", "cards", "track", "mover", "zone", "centre", "banner", "stim", "feedback", "rowset", "opts"];
+  const uiOwn = defined(ui);
+  for (const c of game) assert.ok(!uiOwn.has(c), `ui.css redefines the game class .${c}`);
+  assert.ok(defined(flow).has("field") && defined(flow).has("opt"));
+});
+
+// ================================================================ Fruit Catcher inside the page
+const seeded = (seed) => mulberry(seed);
+function playRound(round, chooser, max = 60 * 100) { for (let i = 0; i < max && !round.over; i++) round.update(FC.STEP, chooser(round)); return round; }
+
+test("fruit catcher (page): lanes from the hand and from a finger", () => {
+  assert.deepEqual([0, 0.39, 0.4, 0.5, 0.6, 0.61, 1].map(FC.laneFromX), [0, 0, 1, 1, 1, 2, 2]);
+  assert.deepEqual([0, 0.32, 0.34, 0.5, 0.66, 0.67, 1].map(FC.laneFromPointer), [0, 0, 1, 1, 1, 2, 2]);
+});
+
+test("fruit catcher (page): fruit and chocolate fall in different outer lanes", () => {
+  const r = new FC.Round(60, seeded(1));
+  for (let i = 0; i < 300; i++) { assert.ok([0, 2].includes(r.fruit.lane) && [0, 2].includes(r.choc.lane)); assert.equal(r.fruit.lane + r.choc.lane, 2); assert.ok(r.fruit.kind >= 0 && r.fruit.kind < FC.FRUIT_KINDS); [r.fruit, r.choc] = r.spawn(); }
+});
+
+test("fruit catcher (page): under the fruit scores, under the chocolate costs lives, the middle is safe", () => {
+  const good = playRound(new FC.Round(60, seeded(2)), (r) => r.fruit.lane);
+  assert.equal(good.over, "TIME_UP"); assert.equal(good.lives, FC.LIVES); assert.equal(good.hit, 0); assert.ok(good.caught >= 20);
+  const bad = playRound(new FC.Round(60, seeded(3)), (r) => r.choc.lane);
+  assert.equal(bad.over, "OUT_OF_LIVES"); assert.equal(bad.lives, 0); assert.equal(bad.hit, FC.LIVES); assert.equal(bad.caught, 0);
+  const safe = playRound(new FC.Round(30, seeded(4)), () => 1);
+  assert.equal(safe.over, "TIME_UP"); assert.deepEqual([safe.caught, safe.hit, safe.lives], [0, 0, FC.LIVES]); assert.ok(safe.missed > 3);
+});
+
+test("fruit catcher (page): speed-up, end of time, gliding, summary", () => {
+  const r = new FC.Round(60, seeded(5));
+  assert.equal(r.speed, FC.BASE_FALL_SPEED); assert.equal(r.speedFactor, 1);
+  r.caught = 3; assert.equal(r.speed, FC.BASE_FALL_SPEED + 1); r.caught = 300; assert.equal(r.speed, FC.BASE_FALL_SPEED + FC.MAX_SPEED_BONUS);
+  const t = new FC.Round(30, seeded(6)); for (let i = 0; i < 60 * 29; i++) t.update(FC.STEP, 1);
+  assert.equal(t.over, null); assert.equal(t.remaining, 1);
+  for (let i = 0; i < 120; i++) t.update(FC.STEP, 1);
+  assert.equal(t.over, "TIME_UP"); assert.deepEqual(t.update(FC.STEP, 0), []);
+  const g = new FC.Round(60, seeded(7)); const lx = FC.LAYOUT.laneX; g.update(FC.STEP, 0);
+  assert.ok(g.charX < lx[1] && g.charX > lx[0]); for (let i = 0; i < 60; i++) g.update(FC.STEP, 0); assert.ok(Math.abs(g.charX - lx[0]) < 2);
+  const s = playRound(new FC.Round(30, seeded(8)), (r) => r.fruit.lane).summary();
+  for (const k of ["score", "caught", "hit", "missed", "duration_s", "played_s", "ended"]) assert.ok(k in s, k);
+  assert.equal(new FC.Round(30).summary().ended, "QUIT");
+});
+
+test("fruit catcher (page): same rules as the PyGame window", () => {
+  const py = readFileSync(new URL("../game/fruit_catcher/logic.py", import.meta.url), "utf8");
+  for (const [name, val] of [["BASE_FALL_SPEED", FC.BASE_FALL_SPEED], ["MAX_SPEED_BONUS", FC.MAX_SPEED_BONUS], ["FRUIT_KINDS", FC.FRUIT_KINDS], ["LIVES", FC.LIVES]]) assert.match(py, new RegExp(name + " = " + val + "(?![0-9])"), name);
+  assert.match(py, /DURATIONS = \(30, 60, 90\)/); assert.deepEqual(FC.DURATIONS, [30, 60, 90]);
+  assert.match(py, /width: int = 1180/); assert.match(py, /height: int = 760/); assert.equal(FC.LAYOUT.width, 1180);
+});
+
+test("fruit catcher (page): everything it loads is in the site, so it works offline", () => {
+  const web = (p) => new URL("../web" + p, import.meta.url);
+  for (const f of ["/vendor/mediapipe/vision_bundle.mjs", "/vendor/mediapipe/hand_landmarker.task", "/vendor/mediapipe/wasm/vision_wasm_internal.js", "/vendor/mediapipe/wasm/vision_wasm_internal.wasm", "/img/fruit/character.png", "/img/fruit/chocolate.png", "/img/fruit/fruit1.png", "/img/fruit/fruit2.png", "/img/fruit/fruit3.png", "/img/fruit/fruit4.png"]) {
+    assert.ok(existsSync(web(f)), f); assert.ok(statSync(web(f)).size > 500, f + " is empty");
+  }
+  const game = readFileSync(web("/js/flow/fruitgame.js"), "utf8"), tr = readFileSync(web("/js/flow/handtrack.js"), "utf8");
+  assert.ok(!/https?:\/\//.test(game.replace(/xmlns|www\.w3\.org/g, "")) && !/https?:\/\/(?!www\.w3)/.test(tr), "no outside web addresses");
+});
+
 // ================================================================ skill areas, charts, cloud
 test("skill areas: every game belongs to one cognitive skill area", () => {
   for (const g of CATALOG) assert.ok(DOMAINS.includes(domainOf(g.skill)), `${g.id} skill "${g.skill}" has no area`);
@@ -659,7 +834,7 @@ test("reports draw charts (svg) with the numbers in them", () => {
   playSession(p, 0.5, "2026-09-01"); playSession(p, 0.75, "2026-09-02");
   const a = reportHtml(p.reports[0]), d = reportHtml(p.reports[2]);
   assert.match(a, /<svg class="chart"/); assert.match(a, /Cognitive skills at the start/);
-  assert.equal((d.match(/<svg class="chart"/g) || []).length, 2);
+  assert.equal((d.match(/<svg class="chart"/g) || []).length, 4, "accuracy over time, each game, skill areas, progress");
   assert.match(d, /Accuracy before and after/); assert.match(d, /Cognitive skills: before and after/);
   assert.match(d, /Assessment/); assert.match(d, /Day 1/); assert.match(d, /Day 2/); assert.match(d, />75%</); assert.match(d, />50%</);
   assert.ok(!/NaN|undefined/.test(a + d));
@@ -669,4 +844,40 @@ test("cloud storage is off without a Firebase config and never throws", async ()
   assert.equal(Cloud.enabled, false);
   assert.equal(await Cloud.restore(), null);
   Cloud.push({ key: "x" }); assert.equal(await Cloud.flush(), true); await Cloud.signOut();
+});
+
+test("movement game: the fall is slow enough to follow, and speeds up only a little", () => {
+  for (const lv of LEVELS) for (const tier of [0, 1, 2]) {
+    const s = FC.sessionPlay(lv, tier);
+    assert.ok(s.baseSpeed <= 6 && s.baseSpeed >= 3, `${lv}/${tier} base speed ${s.baseSpeed}`);
+    const r = new FC.Round(s.duration, mulberry(2), FC.LAYOUT, s);
+    r.caught = 500; assert.ok(r.speed <= s.baseSpeed + 2, "capped at +2");
+    r.caught = 0; assert.equal(r.speed, s.baseSpeed);
+    r.caught = 5; assert.equal(r.speed, s.baseSpeed + 1, "+1 after every 5 fruit");
+  }
+  assert.ok(FC.sessionPlay("hard", 2).baseSpeed < FC.BASE_FALL_SPEED, "slower than free play");
+  assert.equal(FC.sessionPlay("easy", 0).baseSpeed, FC.sessionPlay("easy", 1).baseSpeed - 1, "ages 1 to 5 are gentler");
+});
+
+test("movement game: it can be played again and again (one camera at a time, model kept, sprites never missing)", () => {
+  const ht = readFileSync(new URL("../web/js/flow/handtrack.js", import.meta.url), "utf8");
+  assert.ok(ht.indexOf("releaseCamera();") < ht.lastIndexOf("openCamera(onStatus)"), "an earlier stream is released before a new one is opened");
+  assert.match(ht, /NotReadableError/); assert.match(ht, /attempt < 3/);        // a busy camera is retried
+  assert.match(ht, /if \(landmarker\) return landmarker/);                     // the model is built once
+  assert.ok(!/lm\.close\(\)/.test(ht.replace(/dropModel[^\n]*\n/, "")), "a game ending does not close the shared model");
+  assert.match(ht, /export function preloadHandModel/); assert.match(ht, /cancelled\(\)/);                                           // leaving the page while it starts stops the camera
+  const fg = readFileSync(new URL("../web/js/flow/fruitgame.js", import.meta.url), "utf8");
+  assert.match(fg, /const ASSETS/); assert.match(fg, /ensureAssets/); assert.match(fg, /Try the camera again/);
+  assert.match(fg, /else \{ ctx\.beginPath\(\); ctx\.arc/, "a plain shape is drawn if a sprite is missing");
+});
+
+test("text sizes: nothing on the screens is set below a readable size", () => {
+  for (const f of ["styles.css", "flow.css", "ui.css"]) {
+    const css = readFileSync(new URL("../web/css/" + f, import.meta.url), "utf8");
+    for (const m of css.matchAll(/font-size:\s*(\d*\.?\d+)(rem|px)/g)) {
+      const v = Number(m[1]), rem = m[2] === "rem" ? v : v / 16;
+      assert.ok(rem >= 0.8 || (m[2] === "px" && v >= 14) || m[0].includes("17px"), `${f}: ${m[0]} is too small`);
+    }
+    for (const m of css.matchAll(/font:\s*\d+\s+(\d*\.?\d+)rem/g)) assert.ok(Number(m[1]) >= 0.8, `${f}: ${m[0]}`);
+  }
 });

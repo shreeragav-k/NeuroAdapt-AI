@@ -1,40 +1,67 @@
 // Screens and routing. The rules themselves live in flow/logic.js.
 //
-//   login -> test -> assessment report -> plan <-> session -> daily report
+//   sign in -> assessment -> report -> plan -> daily session (10 games, game 1 is the movement game) -> daily reports
 //
 // A player can only be on the screen that matches their stage; anything else
 // redirects (see `allowed`).
 import * as S from "./flow/storage.js";
-import { GROUPS, LEVEL_LABEL, RULES, domainOf } from "./flow/data.js";
+import { GROUPS, LEVEL_LABEL, BANDS, RULES, DOMAINS, domainOf } from "./flow/data.js";
 import * as Sound from "./flow/sound.js";
 import * as L from "./flow/logic.js";
 import { playGame, shapeSvg } from "./flow/play.js";
 import * as Cloud from "./flow/cloud.js";
 import { createAccount, signInAccount } from "./flow/auth.js";
-import { reportHtml, reportTitle, reportSummary, esc } from "./flow/report.js";
+import { reportHtml, reportTitle, reportSummary, esc, VERDICT } from "./flow/report.js";
+import { icon, markSvg } from "./flow/icons.js";
+import { mountFruitCatcher } from "./flow/fruitgame.js";
+import { sessionPlay } from "./flow/fruitcatcher.js";
+import { preloadHandModel } from "./flow/handtrack.js";
 
 const $main = document.getElementById("main");
 const $nav = document.getElementById("nav");
 const $foot = document.getElementById("foot");
 const $ = (sel, root = document) => root.querySelector(sel);
-let stopGame = null;
+let stopGame = null, fruitGame = null;
 
 const nav = (h) => { if (location.hash === h) route(); else location.hash = h; };
 const setMain = (html) => { $main.innerHTML = html; window.scrollTo({ top: 0 }); };
 const groupOf = (p) => GROUPS.find((g) => g.id === p.groupId);
+const initials = (name) => (String(name).trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("") || "?").toUpperCase();
+const slug = (skill) => (domainOf(skill) || "other").toLowerCase().replace(/[^a-z]+/g, "-");
+const areaSlug = (area) => area.toLowerCase().replace(/[^a-z]+/g, "-");
+const chip = (skill, soft = false) => `<span class="chip ${soft ? "soft" : ""} area-${slug(skill)}">${esc(domainOf(skill))}</span>`;
+const diffDots = (n, of) => `<span class="dots" aria-label="difficulty ${n} of ${of}">${Array.from({ length: of }, (_, k) => `<i class="${k < n ? "on" : ""}"></i>`).join("")}</span>`;
+const longestRun = (trials) => { let best = 0, run = 0; for (const t of trials) { run = t.correct ? run + 1 : 0; best = Math.max(best, run); } return best; };
+const setTitle = (t) => { document.title = t ? `${t} · Halcyon` : "Halcyon · adaptive play"; };
 
 // ------------------------------------------------------------------ chrome
-function renderNav(p, stage) {
-  const links = stage === "learning" ? `<a href="#/plan">Plan</a><a href="#/reports">Reports</a>` : "";
-  $nav.innerHTML = `<div class="wrap">
-    <a class="brand" ${p ? 'href="#/"' : ""} aria-label="Halcyon">Halcyon <i>play studio</i></a>
-    <nav aria-label="Main">${links}</nav>
-    <div style="display:flex;align-items:center;gap:1rem">${p ? `<button class="btn small quiet" id="mute" type="button" aria-pressed="${!Sound.isMuted()}">${Sound.isMuted() ? "Sound off" : "Sound on"}</button>${Cloud.enabled ? `<span class="muted small" id="cloudstat" role="status"></span>` : ""}<span class="who">${esc(p.name)} · ${esc(groupOf(p).label)}</span><button class="btn small quiet" id="signout" type="button">Sign out</button>` : ""}</div></div>`;
+function renderNav(p, stage, name) {
+  const links = stage === "learning"
+    ? `<nav class="topnav" aria-label="Main"><a href="#/plan" ${["plan", "session"].includes(name) ? 'aria-current="page"' : ""}>${icon("calendar", 18)}Plan</a><a href="#/reports" ${["reports", "report"].includes(name) ? 'aria-current="page"' : ""}>${icon("chart", 18)}Reports</a></nav>`
+    : "";
+  const right = p ? `
+    ${Cloud.enabled ? `<span class="cloudstat" id="cloudstat" role="status"></span>` : ""}
+    <button class="iconbtn" id="mute" type="button" aria-pressed="${!Sound.isMuted()}" aria-label="${Sound.isMuted() ? "Sound is off. Turn it on" : "Sound is on. Turn it off"}" title="Sound">${icon(Sound.isMuted() ? "mute" : "volume", 18)}</button>
+    <div class="userchip"><span class="avatar" aria-hidden="true">${esc(initials(p.name))}</span><span class="who-text"><span class="who-name">${esc(p.name)}</span><br><span class="who-sub">${esc(groupOf(p).label)}</span></span></div>
+    <button class="btn small quiet" id="signout" type="button" aria-label="Sign out">${icon("logout", 16)}<span class="so-text">Sign out</span></button>` : "";
+  $nav.innerHTML = `<div class="wrap appbar-in"><a class="brand" href="#/" aria-label="Halcyon home">${markSvg(34)}<b>Halcyon</b><i>play studio</i></a>${links}<div class="appbar-right">${right}</div></div>`;
   const so = $("#signout"); if (so) so.onclick = async () => { await Cloud.signOut(); S.signOut(); mode = "signin"; nav("#/login"); };
-  const mu = $("#mute"); if (mu) mu.onclick = () => { Sound.setMuted(!Sound.isMuted()); mu.textContent = Sound.isMuted() ? "Sound off" : "Sound on"; mu.setAttribute("aria-pressed", !Sound.isMuted()); };
+  const mu = $("#mute");
+  if (mu) mu.onclick = () => {
+    Sound.setMuted(!Sound.isMuted());
+    mu.innerHTML = icon(Sound.isMuted() ? "mute" : "volume", 18); mu.setAttribute("aria-pressed", !Sound.isMuted());
+    mu.setAttribute("aria-label", Sound.isMuted() ? "Sound is off. Turn it on" : "Sound is on. Turn it off");
+  };
   paintCloud();
 }
-$foot.innerHTML = `<div class="wrap"><p class="legal" style="margin-top:0;border-top:0;padding-top:0">Halcyon is a prototype for engagement and practice. Reports describe performance in these games only. They are not a medical assessment and make no diagnosis. Everything stays in this browser.</p></div>`;
+$foot.innerHTML = `<div class="wrap"><span class="brandline">${markSvg(22)}Halcyon</span><p>A prototype for practice and engagement. Reports describe performance in these games only and are not a medical assessment or a diagnosis. Everything stays in this browser unless you switch on cloud storage. <a href="#/privacy">Privacy and the camera</a></p></div>`;
+
+// The path a player follows, shown above the main screens.
+const STEPS = ["Assessment", "Report", "Day 1", "Daily practice"];
+function journey(p) {
+  const st = L.stageOf(p), cur = st === "test" ? 0 : st === "assessment" ? 1 : p.sessions.length === 0 ? 2 : 3;
+  return `<ol class="journey" aria-label="Your progress">${STEPS.map((s, i) => `<li class="${i < cur ? "done" : i === cur ? "current" : ""}" ${i === cur ? 'aria-current="step"' : ""}><span class="dot">${i < cur ? icon("check", 14) : i + 1}</span><span class="jl">${s}</span></li>`).join("")}</ol>`;
+}
 
 // ------------------------------------------------------------ cloud (optional)
 const CLOUD_TEXT = { saving: "Saving…", saved: "Saved to the cloud", ready: "Cloud connected", error: "Cloud unreachable. Saved on this device." };
@@ -48,6 +75,7 @@ if (Cloud.enabled) {
 // ------------------------------------------------------------------- router
 const canonical = (p) => (!p ? "#/login" : { test: "#/test", assessment: "#/assessment", learning: "#/plan" }[L.stageOf(p)]);
 function allowed(name, p) {
+  if (name === "privacy") return true;
   if (!p) return name === "login";
   const stage = L.stageOf(p);
   if (stage === "test") return name === "test";
@@ -57,94 +85,136 @@ function allowed(name, p) {
 
 function route() {
   stopGame && stopGame(); stopGame = null;
+  if (fruitGame) { fruitGame.destroy(); fruitGame = null; }
   const [, name = "login", arg] = (location.hash.slice(1) || "/login").split("/");
   const p = S.active();
   if (!allowed(name, p)) { const to = canonical(p); if (location.hash !== to) { location.hash = to; return; } }
   const stage = p ? L.stageOf(p) : null;
-  renderNav(p, stage);
-  const view = { login: viewLogin, test: viewTest, assessment: viewAssessment, plan: viewPlan, session: viewSession, reports: viewReports, report: viewReport }[name];
+  renderNav(p, stage, name);
+  const view = { login: viewLogin, test: viewTest, assessment: viewAssessment, plan: viewPlan, session: viewSession, reports: viewReports, report: viewReport, privacy: viewPrivacy }[name];
   if (!view) return nav(canonical(p));
+  setTitle({ login: "Sign in", test: "Assessment", assessment: "Assessment report", plan: "Your plan", session: "Daily session", reports: "Reports", report: "Report", privacy: "Privacy and camera" }[name]);
   view(p, arg);
 }
 
-// -------------------------------------------------------------------- login
+// -------------------------------------------------------------------- sign in
 let mode = "signin";
 function viewLogin() {
   const create = mode === "create";
-  setMain(`<div class="page"><div class="wrap onb">
-    <aside><img src="/img/hero.jpg" alt="" width="640" height="800"><p class="muted small">${Cloud.enabled ? "Your account and every result are saved securely in the cloud." : "Accounts are kept in this browser on this computer."} Your age decides which set of games you will see.</p></aside>
-    <div class="reveal"><header><div class="eyebrow">${create ? "Create an account" : "Welcome back"}</div><h1>${create ? "Let's set you up." : "Sign in to play."}</h1></header>
-    <div class="tabs" role="tablist"><button type="button" role="tab" id="tab-in" aria-selected="${!create}">Sign in</button><button type="button" role="tab" id="tab-new" aria-selected="${create}">Create account</button></div>
-    <form id="login" novalidate class="panel" style="display:grid;gap:.4rem">
-      ${create ? `
-      <fieldset><label class="lbl" for="name">Name</label><input type="text" id="name" maxlength="40" autocomplete="name" required></fieldset>
-      <div class="row"><fieldset><label class="lbl" for="age">Age</label><p class="hint">In years, 1 to 60.</p><input type="text" id="age" inputmode="numeric" maxlength="2" autocomplete="off" required style="max-width:9rem"><p class="small" id="agegroup" style="color:var(--teal-deep);min-height:1.5em;margin:.6rem 0 0"></p></fieldset>
-      <fieldset><label class="lbl" for="cond">Health condition <span class="muted" style="font-family:var(--sans);font-size:1rem">(if applicable)</span></label><p class="hint">Optional. Shown on the reports.</p><input type="text" id="cond" maxlength="80" autocomplete="off" placeholder="Leave empty if not applicable"></fieldset></div>` : ""}
-      <fieldset><label class="lbl" for="email">Email</label><input type="text" id="email" inputmode="email" autocomplete="email" maxlength="120" required></fieldset>
-      <fieldset><label class="lbl" for="pw">Password</label>${create ? `<p class="hint">At least ${L.PASSWORD_MIN} characters.</p>` : ""}<input type="password" id="pw" autocomplete="${create ? "new-password" : "current-password"}" maxlength="128" required></fieldset>
-      ${create ? `<fieldset><label class="lbl" for="pw2">Confirm password</label><input type="password" id="pw2" autocomplete="new-password" maxlength="128" required></fieldset>` : ""}
-      <p class="small" id="err" role="alert" style="color:#8d3b2b;min-height:1.4em;margin:0"></p>
-      <div><button class="btn" type="submit">${create ? "Create account" : "Sign in"}</button></div>
-    </form></div></div></div>`);
+  const pwField = (id, label, extra = "") => `<div class="fgroup"><label for="${id}">${label}</label>${extra}<div class="pwwrap"><input type="password" id="${id}" autocomplete="${id === "pw" && !create ? "current-password" : "new-password"}" maxlength="128" required><button type="button" class="pwtoggle" data-for="${id}" aria-label="Show password">${icon("eye", 18)}</button></div></div>`;
+  setMain(`<div class="auth">
+    <section class="brandpanel" aria-label="About Halcyon">
+      <div>
+        <div class="eyebrow">Cognitive and memory training</div>
+        <h1>Train memory and attention, <em>one calm game at a time.</em></h1>
+        <p class="lede">A short assessment finds a comfortable starting level. Then a daily session of ten games adapts to you, with a clear report after every day.</p>
+        <ul>
+          <li><span class="ic-wrap">${icon("target", 20)}</span><div><b>Games matched to age</b><span>Separate sets for ages 1 to 5, 6 to 17 and 18 to 60, built on classic memory and attention tasks.</span></div></li>
+          <li><span class="ic-wrap">${icon("chart", 20)}</span><div><b>Progress you can see</b><span>Charts compare each day with the assessment, skill by skill, and move the level up or down.</span></div></li>
+          <li><span class="ic-wrap">${icon("shield", 20)}</span><div><b>Private by design</b><span>${Cloud.enabled ? "Your account and results are saved securely in your own cloud project." : "Accounts and results stay in this browser on this computer."}</span></div></li>
+        </ul>
+      </div>
+      <div class="groups" aria-label="Age groups"><span>Ages 1 to 5</span><span>Ages 6 to 17</span><span>Ages 18 to 60</span></div>
+    </section>
+    <section class="authside"><div class="authcard reveal">
+      <h2>${create ? "Create your account" : "Welcome back"}</h2>
+      <p class="sub">${create ? "It takes a minute. Your age decides which set of games you will see." : "Sign in to carry on where you stopped."}</p>
+      <div class="seg" role="tablist" aria-label="Sign in or create an account"><button type="button" role="tab" id="tab-in" aria-selected="${!create}">Sign in</button><button type="button" role="tab" id="tab-new" aria-selected="${create}">Create account</button></div>
+      <form id="login" novalidate>
+        ${create ? `
+        <div class="fgroup"><label for="name">Name</label><input type="text" id="name" maxlength="40" autocomplete="name" required></div>
+        <div class="fields-2">
+          <div class="fgroup"><label for="age">Age</label><input type="text" id="age" inputmode="numeric" maxlength="2" autocomplete="off" required><p class="help" id="agegroup">In years, 1 to 60.</p></div>
+          <div class="fgroup"><label for="cond">Health condition <span class="optional">(optional)</span></label><input type="text" id="cond" maxlength="80" autocomplete="off" placeholder="Leave empty if not applicable"><p class="help">Shown on your reports.</p></div>
+        </div>` : ""}
+        <div class="fgroup"><label for="email">Email</label><input type="email" id="email" inputmode="email" autocomplete="email" maxlength="120" required></div>
+        ${pwField("pw", "Password", create ? `<p class="help">At least ${L.PASSWORD_MIN} characters.</p>` : "")}
+        ${create ? pwField("pw2", "Confirm password") : ""}
+        <div class="form-err" id="err" role="alert" hidden>${icon("info", 18)}<span id="errtext"></span></div>
+        <button class="btn lg" type="submit" style="width:100%">${create ? "Create account" : "Sign in"}</button>
+      </form>
+      <p class="fineprint">${icon("lock", 16)}<span>${Cloud.enabled ? "Passwords are handled by Firebase and never stored by this site." : "Passwords are stored only as a salted hash in this browser."}</span></p>
+    </div></section></div>`);
   $("#tab-in").onclick = () => { mode = "signin"; viewLogin(); };
   $("#tab-new").onclick = () => { mode = "create"; viewLogin(); };
+  document.querySelectorAll(".pwtoggle").forEach((b) => (b.onclick = () => {
+    const inp = $(`#${b.dataset.for}`), show = inp.type === "password";
+    inp.type = show ? "text" : "password"; b.innerHTML = icon(show ? "eyeoff" : "eye", 18); b.setAttribute("aria-label", show ? "Hide password" : "Show password");
+  }));
   const age = $("#age");
   if (age) age.oninput = () => {
-    const g = L.groupForAge(/^\d+$/.test(age.value.trim()) ? Number(age.value) : NaN);
-    $("#agegroup").textContent = g ? `Age group: ${g.label}` : "";
+    const g = L.groupForAge(/^\d+$/.test(age.value.trim()) ? Number(age.value) : NaN), h = $("#agegroup");
+    h.textContent = g ? `Age group: ${g.label}` : "In years, 1 to 60."; h.classList.toggle("ok", !!g);
   };
+  const showErr = (msg) => { const e = $("#err"); e.hidden = !msg; $("#errtext").textContent = msg || ""; };
   $("#login").onsubmit = async (e) => {
     e.preventDefault();
     const btn = $("#login button[type=submit]"), label = btn.textContent;
-    btn.disabled = true; btn.textContent = create ? "Creating…" : "Signing in…"; $("#err").textContent = "";
+    btn.classList.add("loading"); btn.textContent = create ? "Creating…" : "Signing in…"; showErr("");
     const val = (id) => ($(id) ? $(id).value : "");
     const r = create
       ? await createAccount(S.state, { name: val("#name"), age: val("#age"), condition: val("#cond"), email: val("#email"), password: val("#pw"), confirm: val("#pw2") }, new Date().toISOString())
       : await signInAccount(S.state, { email: val("#email"), password: val("#pw") });
-    if (r.error) { $("#err").textContent = r.error; btn.disabled = false; btn.textContent = label; return; }
+    if (r.error) { showErr(r.error); btn.classList.remove("loading"); btn.textContent = label; return; }
     S.state.activeKey = r.profile.key; S.save(); mode = "signin";
     if (create && Cloud.enabled && !(await Cloud.flush())) alert("Your account was created, but saving your details to the cloud did not work yet. They will be saved again with your next change.");
     nav(canonical(r.profile));
   };
 }
 
-const slug = (skill) => (domainOf(skill) || "other").toLowerCase().replace(/[^a-z]+/g, "-");
-const diffDots = (n, of) => `<span class="dots" aria-label="difficulty ${n} of ${of}">${Array.from({ length: of }, (_, k) => `<i class="${k < n ? "on" : ""}"></i>`).join("")}</span>`;
-const longestRun = (trials) => { let best = 0, run = 0; for (const t of trials) { run = t.correct ? run + 1 : 0; best = Math.max(best, run); } return best; };
-
 // ---------------------------------------------------- generic "play a set"
 // Plays `games` one after another from `cfg.index()`; records each with `cfg.record`.
+const setbar = (cfg, games, i, g, state) => `<div class="setbar area-${slug(g.skill)}"><div class="s-row"><span><b>${esc(cfg.label)}</b></span><span>${state}</span></div><div class="segs" aria-hidden="true">${games.map((_, k) => `<i class="${k < i ? "on" : k === i ? "now" : ""}"></i>`).join("")}</div></div>`;
+
 function runSet(p, cfg) {
   const games = cfg.games, tier = groupOf(p).tier;
   const step = () => {
     const i = cfg.index(), g = games[i];
     L.assertInGroup(g, p.groupId);
     const area = domainOf(g.skill);
-    setMain(`<div class="page"><div class="wrap narrow reveal taskcard area-${slug(g.skill)}">
-      <div class="eyebrow">${esc(cfg.label)} · Game ${i + 1} of ${games.length}</div>
-      <h1>${esc(g.title)}</h1><p class="lede">${esc(g.how)}</p>
-      <dl class="task">
-        <div><dt>Cognitive skill</dt><dd><span class="areachip">${esc(area)}</span> ${esc(g.skill)}</dd></div>
-        <div><dt>Classic task</dt><dd>${esc(g.task)}</dd></div>
-        <div><dt>What it trains</dt><dd>${esc(g.trains)}</dd></div>
-        <div><dt>Difficulty</dt><dd>${diffDots(g.difficulty, games.length)} <span class="muted small">game ${g.difficulty} of ${games.length}, easiest to hardest</span></dd></div>
-      </dl>
-      ${tier === 0 ? `<p class="muted small">A grown-up can read the instructions aloud and help with tapping.</p>` : ""}
-      <div class="steps" aria-hidden="true">${games.map((_, k) => `<i class="${k < i ? "on" : ""}"></i>`).join("")}</div>
-      <button class="btn" id="go" type="button">Start game</button></div></div>`);
+    setMain(`<div class="page"><div class="wrap narrow reveal">
+      ${setbar(cfg, games, i, g, `Game ${i + 1} of ${games.length}`)}
+      <article class="card taskcard area-${slug(g.skill)}">
+        <div class="tc-head"><span class="chip">${esc(area)}</span><h1>${esc(g.title)}</h1><p class="lede">${esc(g.how)}</p></div>
+        <div class="tc-body">
+          <dl class="task">
+            <div><dt>Cognitive skill</dt><dd>${esc(g.skill)}</dd></div>
+            <div><dt>Classic task</dt><dd>${esc(g.task)}</dd></div>
+            <div class="wide"><dt>What it trains</dt><dd>${esc(g.trains)}</dd></div>
+            <div class="wide"><dt>Difficulty</dt><dd>${diffDots(g.difficulty, games.length)} <span class="muted small">game ${g.difficulty} of ${games.length}, from easiest to hardest</span></dd></div>
+          </dl>
+          ${tier === 0 ? `<div class="notice">${icon("info", 18)}<span>A grown-up can read the instructions aloud and help with tapping.</span></div>` : ""}
+          ${g.engine === "fruit" ? `<div class="notice privacy">${icon("lock", 18)}<span><b>The camera is optional and the video is never recorded.</b> Your hand is found on this device, frame by frame, and nothing is saved or sent. Prefer not to use it? The arrow keys or a tap work just as well. <a href="#/privacy">More</a></span></div>` : ""}
+          <div class="actions"><button class="btn lg" id="go" type="button">${icon("play", 18)}Start game</button></div>
+        </div></article></div></div>`);
     $("#go").onclick = () => play(i, g);
+    if (g.engine === "fruit") preloadHandModel();          // load the hand model while the card is being read
+  };
+  const saved = (i, g, trials) => {
+    stopGame = null;
+    let report = null;
+    try { report = cfg.record(g, trials); S.save(); } catch (err) { setMain(`<div class="page"><div class="wrap narrow"><div class="notice warm">${icon("info", 18)}<span>Something went wrong saving this game: ${esc(err.message)}</span></div></div></div>`); return; }
+    finished(i, g, trials, report);
+  };
+  // the movement game has its own player: one scored round, the camera is switched off as soon as it is over
+  const playMovement = (i, g) => {
+    const level = g.mode.split("-")[1];
+    setMain(`<div class="page"><div class="wrap fc-wrap area-${slug(g.skill)}"><h1 class="visually-hidden">${esc(g.title)}</h1>
+      ${setbar(cfg, games, i, g, `${esc(g.title)} · game ${i + 1} of ${games.length}`)}
+      <div class="card fc-card-wrap"><div id="fc-host"></div></div></div></div>`);
+    fruitGame = mountFruitCatcher($("#fc-host"), {
+      session: { ...sessionPlay(level, tier), steps: BANDS[level] },
+      onContinue: (trials) => { fruitGame && fruitGame.destroy(); fruitGame = null; saved(i, g, trials); },
+    });
   };
   const play = (i, g) => {
-    setMain(`<div class="page"><div class="wrap narrow play-wrap area-${slug(g.skill)}"><div class="eyebrow">${esc(cfg.label)} · Game ${i + 1} of ${games.length} · ${esc(domainOf(g.skill))}</div><h1 class="game-title">${esc(g.title)}</h1><div id="host"></div></div></div>`);
+    if (g.engine === "fruit") return playMovement(i, g);
+    setMain(`<div class="page"><div class="wrap narrow play-wrap area-${slug(g.skill)}"><h1 class="visually-hidden">${esc(g.title)}</h1>
+      ${setbar(cfg, games, i, g, `${esc(g.title)} · game ${i + 1} of ${games.length}`)}<div id="host"></div></div></div>`);
     const handle = playGame({
       host: $("#host"), game: g, tier, rounds: { isTest: cfg.isTest, defaults: { test: RULES.testRounds, session: RULES.sessionRounds } },
       stepFor: cfg.stepFor,
-      onDone: (trials) => {
-        stopGame = null;
-        let report = null;
-        try { report = cfg.record(g, trials); S.save(); } catch (err) { setMain(`<div class="page"><div class="wrap narrow"><div class="callout warm">Something went wrong saving this game: ${esc(err.message)}</div></div></div>`); return; }
-        finished(i, g, trials, report);
-      },
+      onDone: (trials) => saved(i, g, trials),
     });
     stopGame = handle.stop;
   };
@@ -152,14 +222,16 @@ function runSet(p, cfg) {
     const last = i + 1 === games.length, right = trials.filter((t) => t.correct).length, acc = L.pct(right, trials.length);
     const stars = acc >= 85 ? 3 : acc >= 60 ? 2 : 1;
     setMain(`<div class="page"><div class="wrap narrow reveal">
-      <div class="eyebrow">${esc(cfg.label)} · Game ${i + 1} of ${games.length} complete</div>
-      <h1>${esc(g.title)}</h1>
-      ${cfg.showScore
-        ? `<div class="stars" role="img" aria-label="${stars} of 3 stars">${[1, 2, 3].map((n) => shapeSvg("star", n <= stars ? "#e8b923" : "#d9d0bd", 52)).join("")}</div>
-           <p class="lede">You got ${right} of ${trials.length} right (${acc}%).${longestRun(trials) >= 3 ? ` Longest run: ${longestRun(trials)} in a row.` : ""}</p>`
-        : `<p class="lede">Well done. That game is finished.</p>`}
-      <div class="steps" aria-hidden="true">${games.map((_, k) => `<i class="${k <= i ? "on" : ""}"></i>`).join("")}</div>
-      <button class="btn" id="nx" type="button">${last ? "See the report" : "Next game"}</button></div></div>`);
+      ${setbar(cfg, games, i + 1, g, `Game ${i + 1} of ${games.length} complete`)}
+      <div class="card finish area-${slug(g.skill)}">
+        <span class="chip">${esc(domainOf(g.skill))}</span>
+        <h1>${esc(g.title)}</h1>
+        ${cfg.showScore
+          ? `<div class="stars" role="img" aria-label="${stars} of 3 stars">${[1, 2, 3].map((n) => shapeSvg("star", n <= stars ? "#e8b923" : "#d9d0bd", 52)).join("")}</div>
+             <p class="lede">You got ${right} of ${trials.length} right (${acc}%).${longestRun(trials) >= 3 ? ` Longest run: ${longestRun(trials)} in a row.` : ""}</p>`
+          : `<p class="lede">Well done. That game is finished.</p>`}
+        <button class="btn lg" id="nx" type="button">${last ? "See the report" : "Next game"}${icon("arrow", 18)}</button>
+      </div></div></div>`);
     $("#nx").onclick = () => (last ? nav(cfg.afterLast(report)) : step());
   };
   step();
@@ -177,42 +249,111 @@ function viewTest(p) {
   });
   if (done > 0) return begin();
   setMain(`<div class="page"><div class="wrap narrow reveal">
-    <div class="eyebrow">Step 1 · Assessment</div><h1>Hello, ${esc(p.name)}.</h1>
-    <p class="lede">First, five short games for ${esc(groupOf(p).label.toLowerCase())}, from the easiest to the most demanding. Each one starts in the middle and gets a little easier or harder depending on how you do, so there is nothing to pass or fail. Afterwards you will get a report and a plan.</p>
-    <ol class="plan">${games.map((g) => `<li><b>${esc(g.title)}</b><span>${esc(g.skill)} · ${esc(g.task)}</span></li>`).join("")}</ol>
-    <button class="btn" id="b" type="button">Begin the assessment</button></div></div>`);
+    ${journey(p)}
+    <div class="page-head"><div><div class="eyebrow">Step 1 · Assessment</div><h1>Hello, ${esc(p.name)}.</h1>
+      <p class="lede">Five short games for ${esc(groupOf(p).label.toLowerCase())}. They find a comfortable starting level and show where your strengths are.</p></div></div>
+    <div class="how3">
+      <div class="card">${icon("layers", 22)}<b>Easiest to hardest</b><span>The games are in order of difficulty, so you warm up first.</span></div>
+      <div class="card">${icon("target", 22)}<b>Adjusts as you play</b><span>Each game gets a little easier or harder depending on how you do.</span></div>
+      <div class="card">${icon("shield", 22)}<b>No pass or fail</b><span>Afterwards you get a report and a plan. About five minutes.</span></div>
+    </div>
+    <div class="card"><div class="card-head"><h2>The five games</h2><span class="sub">in the order you will play them</span></div>
+      <ol class="timeline">${games.map((g) => `<li class="tl area-${slug(g.skill)}"><span class="rank">${g.difficulty}</span><div><div class="g-title">${esc(g.title)}</div><div class="g-sub">${esc(g.skill)} · ${esc(g.task)}</div></div>${chip(g.skill)}</li>`).join("")}</ol>
+      <div class="actions" style="margin-top:1.4rem"><button class="btn lg" id="b" type="button">${icon("play", 18)}Begin the assessment</button></div>
+    </div></div></div>`);
   $("#b").onclick = begin;
 }
 
 function viewAssessment(p) {
   const r = p.reports.find((x) => x.id === "assessment");
-  setMain(`<div class="page"><div class="wrap">${reportHtml(r)}
-    <div class="nav-row no-print"><button class="btn quiet" type="button" onclick="window.print()">Print this report</button><button class="btn" id="plan" type="button">Continue to adaptive learning</button></div></div></div>`);
+  setMain(`<div class="page"><div class="wrap">${journey(p)}${reportHtml(r)}
+    <div class="report-actions no-print"><button class="btn quiet" type="button" onclick="window.print()">${icon("print", 18)}Print this report</button><button class="btn lg" id="plan" type="button">Continue to adaptive learning${icon("arrow", 18)}</button></div></div></div>`);
   $("#plan").onclick = () => { L.markAssessmentViewed(p); S.save(); nav("#/plan"); };
 }
 
 // --------------------------------------------------------------------- plan
+// Latest accuracy for each skill area: the last daily report, or the assessment before the first one.
+function skillScores(p) {
+  const daily = [...p.reports].reverse().find((r) => r.type === "daily"), a = p.reports.find((r) => r.id === "assessment");
+  const m = daily ? Object.fromEntries((daily.skills || []).filter((k) => k.today != null).map((k) => [k.area, k.today])) : (a && a.domains) || {};
+  return DOMAINS.filter((d) => m[d] != null).map((area) => ({ area, score: m[area] }));
+}
+
+function spark(vals, labels) {
+  const W = 320, H = 110, Lm = 30, R = 12, T = 12, B = 24, n = vals.length;
+  const x = (i) => (n === 1 ? W / 2 : Lm + ((W - Lm - R) * i) / (n - 1)), y = (v) => T + (H - T - B) * (1 - v / 100);
+  const grid = [0, 50, 100].map((v) => `<line class="axis" x1="${Lm}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${Lm - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join("");
+  const pts = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Accuracy: ${vals.map((v, i) => `${labels[i]} ${v}%`).join(", ")}">${grid}<polyline class="line" points="${pts}"/>${vals.map((v, i) => `<circle class="pt" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4.5"/>`).join("")}${[0, n - 1].filter((v, i, a) => a.indexOf(v) === i).map((i) => `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 && n > 1 ? "start" : n > 1 ? "end" : "middle"}">${esc(labels[i])}</text>`).join("")}</svg>`;
+}
+
 function viewPlan(p) {
   const today = S.today(), st = L.sessionState(p, today), level = p.current ? p.current.level : p.level;
   const games = L.levelGames(p.groupId, level), doneIds = new Set(p.current ? p.current.done.map((d) => d.gameId) : []);
-  const day = p.sessions.length + (p.current || st === "ready" ? 1 : 0);
+  const doneCount = doneIds.size, finishedToday = st === "done_today", day = p.sessions.length + (p.current || st === "ready" ? 1 : 0) || p.sessions.length;
+  const nextDay = p.sessions.length + 1, progress = L.progressSummary(p);
   const last = p.sessions[p.sessions.length - 1];
-  const focus = L.focusAreas(p), focusSet = new Set(focus.map((f) => f.area));
-  const action = st === "ready" ? `<button class="btn" id="start" type="button">Start today's session (Day ${day})</button>`
-    : st === "resume" ? `<button class="btn" id="start" type="button">Resume today's session (game ${p.current.done.length + 1} of ${games.length})</button>`
-    : `<div class="callout">Today's session is complete. The next one opens tomorrow, with the ${LEVEL_LABEL[p.level]} games.</div>
-       <p class="small muted" style="margin-top:1rem">Testing aid: <button class="linkbtn" id="skip" type="button">pretend it is tomorrow</button></p>`;
-  setMain(`<div class="page"><div class="wrap">
-    <header><div class="eyebrow">Adaptive learning</div><h1>${esc(p.name)}, your plan.</h1>
-    <p class="lede">Current level: <b>${LEVEL_LABEL[level]}</b>. One session a day, made of these ${games.length} games. The games run from a gentle warm-up to the most demanding, and the ones for your weakest skills are marked. After each day a report compares your accuracy with earlier days and decides whether the level stays or changes.</p></header>
-    <div class="two"><section class="panel"><h3 style="font-size:1.7rem;margin-bottom:1rem">The ${LEVEL_LABEL[level]} games</h3>
-      <ol class="plan">${games.map((g) => `<li class="${doneIds.has(g.id) ? "done" : ""}"><b>${esc(g.title)}${focusSet.has(domainOf(g.skill)) ? ` <em class="tag focus">focus</em>` : ""}</b><span>${esc(g.skill)} · ${esc(g.task)}${doneIds.has(g.id) ? " · done today" : ""}</span></li>`).join("")}</ol></section>
-    <section class="panel" style="align-self:start"><h3 style="font-size:1.7rem;margin-bottom:1rem">Today</h3>
-      <p class="muted">${last ? `Last session: Day ${last.n}, ${LEVEL_LABEL[last.level]}, ${last.accuracy}%.` : "No sessions yet. This will be Day 1."}</p>
-      ${focus.length ? `<div class="callout" style="margin-bottom:1.2rem"><b>Skills to build</b><br>${focus.map((f) => `${esc(f.area)}: ${f.score}%`).join(" · ")}<br><span class="small">These are your lowest skill areas so far. Their games are marked "focus".</span></div>` : ""}${action}
-      ${p.sessions.length ? `<p style="margin-top:1.4rem"><a href="#/reports">All reports</a></p>` : ""}</section></div></div></div>`);
+  const focus = L.focusAreas(p), focusSet = new Set(focus.map((f) => f.area)), scores = skillScores(p);
+  const a = p.reports.find((r) => r.id === "assessment");
+  const trend = [...(a ? [{ v: a.overallAccuracy, l: "Start" }] : []), ...p.sessions.map((s) => ({ v: s.accuracy, l: `Day ${s.n}` }))];
+  const action = st === "ready" ? `<button class="btn lg" id="start" type="button">${icon("play", 18)}Start today's session</button>`
+    : st === "resume" ? `<button class="btn lg" id="start" type="button">${icon("play", 18)}Resume at game ${doneCount + 1} of ${games.length}</button>`
+    : `<div class="notice">${icon("check", 18)}<span><b>Today's session is complete.</b> The next one opens tomorrow, with the ${LEVEL_LABEL[p.level]} games.</span></div>
+       <p class="small muted" style="margin:.8rem 0 0">Testing aid: <button class="linkbtn" id="skip" type="button">pretend it is tomorrow</button></p>`;
+  const firstName = p.name.trim().split(/\s+/)[0];
+  setMain(`<div class="page"><div class="wrap reveal">
+    ${journey(p)}
+    <div class="page-head"><div><div class="eyebrow">Adaptive learning</div><h1>Good to see you, ${esc(firstName)}.</h1>
+      <p class="lede">One session a day, made of the ten ${LEVEL_LABEL[level]} games, from a gentle warm-up to the most demanding. A report after each day compares your accuracy with earlier days.</p></div></div>
+    <div class="kpis">
+      <div class="kpi"><span class="k-top">${icon("layers", 16)}Level</span><span class="k-val">${LEVEL_LABEL[level]}</span><span class="k-sub">${p.sessions.length ? `Updated after Day ${p.sessions.length}` : "Chosen from your assessment"}</span></div>
+      <div class="kpi"><span class="k-top">${icon("calendar", 16)}Session</span><span class="k-val">Day ${finishedToday ? p.sessions.length : day}</span><span class="k-sub">${finishedToday ? "Completed today" : "One session a day"}</span></div>
+      <div class="kpi"><span class="k-top">${icon("chart", 16)}Last accuracy</span><span class="k-val">${last ? last.accuracy + "%" : "—"}</span><span class="k-sub">${last ? `Day ${last.n}, ${LEVEL_LABEL[last.level]}` : "No sessions yet"}</span></div>
+      <div class="kpi"><span class="k-top">${icon("check", 16)}Completed</span><span class="k-val">${p.sessions.length}</span><span class="k-sub">${p.sessions.length === 1 ? "session" : "sessions"} finished</span></div>
+    </div>
+    <div class="dash">
+      <section class="card"><div class="card-head"><div><h2>${finishedToday ? "Tomorrow's session" : "Today's session"}</h2><span class="sub">Day ${finishedToday ? nextDay : day} · ${LEVEL_LABEL[level]} · ${games.length} games</span></div><span class="badge ${level}">${LEVEL_LABEL[level]}</span></div>
+        ${finishedToday ? "" : `<div class="progressbar" role="progressbar" aria-valuemin="0" aria-valuemax="${games.length}" aria-valuenow="${doneCount}"><i style="width:${(doneCount / games.length) * 100}%"></i></div>
+        <p class="small muted" style="margin:.5rem 0 1rem">${doneCount} of ${games.length} games done today</p>`}
+        <div class="notice privacy" style="margin-bottom:1rem">${icon("camera", 18)}<span><b>Game 1 is Fruit Catcher</b>, a movement game you can play with your hand in front of the camera. <b>The video is never recorded</b> and the camera is optional. <a href="#/privacy">How this works</a></span></div>
+        ${action}
+        <ol class="glist">${games.map((g, i) => `<li class="grow area-${slug(g.skill)} ${doneIds.has(g.id) ? "done" : i === doneCount && st !== "done_today" ? "next" : ""}"><span class="rank">${doneIds.has(g.id) ? icon("check", 16) : g.difficulty}</span><div><div class="g-title">${esc(g.title)}${focusSet.has(domainOf(g.skill)) ? ` <em class="tag focus">focus</em>` : ""}</div><div class="g-sub">${esc(g.skill)} · ${esc(g.task)}</div></div>${chip(g.skill, true)}</li>`).join("")}</ol>
+      </section>
+      <div class="stack">
+        <section class="card"><div class="card-head"><h3>Skill areas</h3><span class="sub">${p.sessions.length ? "latest day" : "assessment"}</span></div>
+          ${scores.length ? `<ul class="skillbars">${scores.map((s) => `<li class="area-${areaSlug(s.area)} ${focusSet.has(s.area) ? "weak" : ""}"><div class="s-top"><b>${esc(s.area)}</b><span>${s.score}%</span></div><div class="progressbar"><i style="width:${s.score}%"></i></div></li>`).join("")}</ul>` : `<p class="empty">Your skill areas appear after the assessment.</p>`}
+          ${focus.length ? `<p class="small muted" style="margin:1rem 0 0">Marked "focus": your lowest areas so far. Their games are tagged in today's list.</p>` : ""}
+        </section>
+        <section class="card"><div class="card-head"><h3>Accuracy</h3><a class="small" href="#/reports">All reports</a></div>
+          ${trend.length >= 2 ? spark(trend.map((t) => t.v), trend.map((t) => t.l)) : `<p class="empty">${trend.length ? "After Day 1 you will see how your accuracy changes from the assessment." : "Your accuracy chart appears after the assessment."}</p>`}
+        </section>
+        <section class="card"><div class="card-head"><h3>Is it working?</h3><span class="sub">since the assessment</span></div>
+          ${progress ? `<div class="verdict ${progress.verdict}"><b>${VERDICT[progress.verdict][0]}</b><span>${VERDICT[progress.verdict][1]}</span></div>
+            <dl class="mini-dl"><div><dt>Accuracy</dt><dd>${progress.startAccuracy}% → ${progress.nowAccuracy}%</dd></div><div><dt>Level</dt><dd>${LEVEL_LABEL[progress.startLevel]} → ${LEVEL_LABEL[progress.nowLevel]}</dd></div>${progress.best ? `<div><dt>Biggest gain</dt><dd>${esc(progress.best.area)} (+${progress.best.change})</dd></div>` : ""}</dl>
+            <p class="small muted" style="margin:.8rem 0 0">Compares your latest day with the assessment, in these games only. Details are in your daily report.</p>`
+          : `<p class="empty">After your first daily report you will see whether your results are moving up.</p>`}
+        </section>
+      </div>
+    </div></div></div>`);
   const b = $("#start"); if (b) b.onclick = () => nav("#/session");
+  if (b) preloadHandModel();
   const k = $("#skip"); if (k) k.onclick = () => { S.skipToNextDay(); route(); };
+}
+
+// ------------------------------------------------------------------ privacy
+function viewPrivacy(p) {
+  const back = p ? `<a class="btn quiet" href="${canonical(p)}">${icon("arrow", 18)}Back</a>` : `<a class="btn quiet" href="#/login">${icon("arrow", 18)}Back to sign in</a>`;
+  setMain(`<div class="page"><div class="wrap narrow reveal">
+    <div class="page-head"><div><div class="eyebrow">Privacy</div><h1>The camera is never recorded</h1>
+      <p class="lede">Fruit Catcher, game 1 of every daily session, can follow your hand with the camera. This is exactly what happens to the picture.</p></div></div>
+    <div class="card prose">
+      <div class="privrow"><span class="ic-wrap">${icon("lock", 20)}</span><div><b>No recording, ever</b><p>The page never saves video, photos or audio. There is no recording code in it, and the microphone is never asked for.</p></div></div>
+      <div class="privrow"><span class="ic-wrap">${icon("shield", 20)}</span><div><b>Nothing leaves your device</b><p>The hand-finding model runs inside your browser, from files stored with this site. The camera picture is never uploaded, not even to the cloud project if you switched on cloud storage. Only your game scores are saved.</p></div></div>
+      <div class="privrow"><span class="ic-wrap">${icon("camera", 20)}</span><div><b>What is read from the picture</b><p>Only one number per moment: whether your hand is on the left, in the middle or on the right. That decides which lane the character moves to. The picture is dropped right after.</p></div></div>
+      <div class="privrow"><span class="ic-wrap">${icon("check", 20)}</span><div><b>You are in control</b><p>The camera is optional: the arrow keys, a mouse or a finger work just as well. A "Turn camera off" button sits on the preview, and the camera switches off by itself when the game ends or you leave the page. Your browser's camera light shows whenever it is on.</p></div></div>
+      <p class="small muted">Account details and scores stay in this browser${Cloud.enabled ? ", and are also saved to your own cloud project" : " unless cloud storage is switched on"}. Reports describe performance in the games and are not a medical assessment.</p>
+      <div class="actions">${back}</div>
+    </div></div></div>`);
 }
 
 // ------------------------------------------------------------------ session
@@ -232,18 +373,26 @@ function viewSession(p) {
 
 // ------------------------------------------------------------------ reports
 function viewReports(p) {
-  const rs = [...p.reports].reverse();
-  setMain(`<div class="page"><div class="wrap"><header><div class="eyebrow">Reports</div><h1>${esc(p.name)}'s reports.</h1></header>
-    <div class="panel"><div class="tablewrap"><table><thead><tr><th>Report</th><th>Date</th><th>Result</th><th></th></tr></thead><tbody>
-    ${rs.map((r) => `<tr><td><b>${esc(reportTitle(r))}</b></td><td>${esc(r.date)}</td><td>${esc(reportSummary(r))}</td><td><a class="btn small quiet" href="#/report/${esc(r.id)}">Open</a></td></tr>`).join("")}
-    </tbody></table></div></div></div></div>`);
+  const rs = [...p.reports].reverse(), a = p.reports.find((r) => r.id === "assessment");
+  const trend = [...(a ? [{ v: a.overallAccuracy, l: "Start" }] : []), ...p.sessions.map((s) => ({ v: s.accuracy, l: `Day ${s.n}` }))];
+  setMain(`<div class="page"><div class="wrap reveal">
+    <div class="page-head"><div><div class="eyebrow">Reports</div><h1>${esc(p.name.trim().split(/\s+/)[0])}'s reports</h1>
+      <p class="lede">Every report is kept here: the assessment and one for each day, each compared with the days before.</p></div></div>
+    <div class="dash">
+      <section class="card"><div class="card-head"><h2>All reports</h2><span class="sub">${rs.length} ${rs.length === 1 ? "report" : "reports"}</span></div>
+        <ul class="reports-list">${rs.map((r) => `<li><a class="rrow" href="#/report/${esc(r.id)}"><span class="r-ic">${icon(r.type === "assessment" ? "target" : "doc", 22)}</span><span><span class="r-title">${esc(reportTitle(r))}</span><br><span class="r-sub">${esc(r.date)} · ${esc(reportSummary(r))}</span></span><span class="r-acc">${r.type === "assessment" ? r.overallAccuracy : r.accuracy}%</span><span class="badge ${r.type === "assessment" ? r.level : r.nextLevel}">${LEVEL_LABEL[r.type === "assessment" ? r.level : r.nextLevel]}</span></a></li>`).join("")}</ul>
+      </section>
+      <section class="card"><div class="card-head"><h3>Accuracy over time</h3></div>
+        ${trend.length >= 2 ? spark(trend.map((t) => t.v), trend.map((t) => t.l)) : `<p class="empty">The chart appears after your first daily report.</p>`}
+      </section>
+    </div></div></div>`);
 }
 
 function viewReport(p, id) {
   const r = p.reports.find((x) => x.id === id);
   if (!r) return nav("#/reports");
   setMain(`<div class="page"><div class="wrap">${reportHtml(r)}
-    <div class="nav-row no-print"><a class="btn quiet" href="#/reports">All reports</a><span style="display:flex;gap:1rem;flex-wrap:wrap"><button class="btn quiet" type="button" onclick="window.print()">Print this report</button><a class="btn" href="#/plan">Back to the plan</a></span></div></div></div>`);
+    <div class="report-actions no-print"><a class="btn quiet" href="#/reports">All reports</a><span style="display:flex;gap:.8rem;flex-wrap:wrap"><button class="btn quiet" type="button" onclick="window.print()">${icon("print", 18)}Print this report</button><a class="btn" href="#/plan">Back to the plan${icon("arrow", 18)}</a></span></div></div></div>`);
 }
 
 // -------------------------------------------------------------------- boot

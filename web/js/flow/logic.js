@@ -286,12 +286,52 @@ function finishSession(p) {
     nextLevel: decision.newLevel,
     nextPlan: levelGames(p.groupId, decision.newLevel).map(({ id, title, skill }) => ({ id, title, skill })),
   };
+  report.progress = progressFrom(assessment, [...p.reports.filter((r) => r.type === "daily"), report], decision.newLevel);
   p.sessions.push(session);
   p.level = decision.newLevel;
   p.current = null;
   p.reports.push(report);
   return report;
 }
+
+// ------------------------------------------------------- is it working?
+// Change since the assessment, worked out from the saved reports only. Three signals:
+//   - the level (has the player moved up since the assessment?)
+//   - the same level over time (first against latest session at the level played most recently twice or more:
+//     this compares like with like, because the games and their difficulty are the same)
+//   - each skill area, assessment against the latest day
+// A change of 5 points or more counts as a real move; anything smaller is treated as steady.
+export const MEANINGFUL = 5;
+export function progressFrom(assessment, dailies, level) {
+  if (!assessment || !dailies.length) return null;
+  const last = dailies[dailies.length - 1];
+  const change = last.accuracy - assessment.overallAccuracy;
+  const levelsGained = LEVELS.indexOf(level) - LEVELS.indexOf(assessment.level);
+
+  let sameLevel = null;
+  for (const lv of [...LEVELS].reverse()) {
+    const at = dailies.filter((d) => d.level === lv);
+    if (at.length >= 2) { sameLevel = { level: lv, sessions: at.length, first: at[0].accuracy, latest: at[at.length - 1].accuracy, change: at[at.length - 1].accuracy - at[0].accuracy }; break; }
+  }
+  const start = assessment.domains || {}, now = Object.fromEntries((last.skills || []).filter((k) => k.today != null).map((k) => [k.area, k.today]));
+  const areas = DOMAINS.filter((d) => start[d] != null && now[d] != null).map((d) => ({ area: d, start: start[d], now: now[d], change: now[d] - start[d] }));
+  const better = areas.filter((a) => a.change >= MEANINGFUL), worse = areas.filter((a) => a.change <= -MEANINGFUL);
+  const best = [...areas].sort((a, b) => b.change - a.change)[0] || null;
+
+  const up = (levelsGained > 0) + (sameLevel && sameLevel.change >= MEANINGFUL ? 1 : 0) + (better.length >= 2 || (better.length === 1 && areas.length <= 2) ? 1 : 0);
+  const down = (levelsGained < 0) + (sameLevel && sameLevel.change <= -MEANINGFUL ? 1 : 0) + (worse.length >= 2 ? 1 : 0);
+  let verdict = "steady";
+  if (dailies.length < 2) verdict = "early";
+  else if (up && !down) verdict = "improving";
+  else if (up && down) verdict = "mixed";
+  else if (down) verdict = "slipping";
+  return {
+    days: dailies.length, startAccuracy: assessment.overallAccuracy, nowAccuracy: last.accuracy, change,
+    startLevel: assessment.level, nowLevel: level, levelsGained, sameLevel, areas, better: better.length, worse: worse.length,
+    best: best && best.change > 0 ? best : null, verdict,
+  };
+}
+export const progressSummary = (p) => progressFrom(p.reports.find((r) => r.id === "assessment"), p.reports.filter((r) => r.type === "daily"), p.level);
 
 // ----------------------------------------------------------------- dates
 export function dayKey(d = new Date()) {

@@ -3,7 +3,7 @@
 **Current version:** a website that trains cognitive and memory skills by age group (1-5, 6-17, 18-60). Create an account, take a 5-game assessment, get a report and a level (Easy, Medium, Hard), then play a daily 10-game session that ends with a report comparing earlier days, with charts. 105 games, none shared between groups or levels.
 
 ```bash
-python run.py        # then open http://127.0.0.1:8765/
+py main.py           # (or: py run.py)  then open http://127.0.0.1:8765/
 node --test tests/flow.test.mjs
 ```
 

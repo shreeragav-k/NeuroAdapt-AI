@@ -13,10 +13,12 @@ game window. Everything stays on this computer: the server only listens on
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,7 +28,7 @@ WEB = ROOT / "web"
 DATA = ROOT / "data"
 GAME = ROOT / "game"
 CATALOG = json.loads((ROOT / "catalog.json").read_text(encoding="utf-8"))
-GAME_IDS = {g["id"] for g in CATALOG["games"]}
+GAME_IDS = {g["id"] for g in CATALOG["games"]} | {"fruit_catcher"}
 MAX_BODY = 200_000
 
 _proc: subprocess.Popen | None = None
@@ -52,6 +54,10 @@ def game_running() -> bool:
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # Windows can map .js to text/plain, which makes the browser refuse module scripts; set the types ourselves.
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css",
+                      ".json": "application/json", ".svg": "image/svg+xml", ".wasm": "application/wasm", ".task": "application/octet-stream"}
+
     def __init__(self, *a, **k):
         super().__init__(*a, directory=str(WEB), **k)
 
@@ -96,6 +102,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"game_running": game_running()})
         if path == "/api/profile":
             return self._json(read_json(DATA / "profile.json", {}))
+        if path == "/api/fruit-catcher":
+            return self._json(read_json(DATA / "fruit_catcher.json", {}))
         if path == "/api/progress":
             return self._json(read_json(DATA / "progress.json", {}))
         if path == "/catalog.json":
@@ -140,15 +148,27 @@ class Handler(SimpleHTTPRequestHandler):
         with _lock:
             if game_running():
                 return self._json({"ok": True, "already_running": True})
-            cmd = [sys.executable, "-m", "halcyon_game"]
-            if gid:
-                cmd += ["--game", gid]
-            if movement:
-                cmd += ["--movement", movement]
+            if gid == "fruit_catcher":
+                cmd = [sys.executable, "-m", "fruit_catcher"]
+                if importlib.util.find_spec("pygame") is None:
+                    return self._json({"error": f"PyGame is not installed for this Python. Run:  {Path(sys.executable).name} -m pip install -r game/requirements.txt"}, 500)
+            else:
+                cmd = [sys.executable, "-m", "halcyon_game"]
+                if gid:
+                    cmd += ["--game", gid]
+                if movement:
+                    cmd += ["--movement", movement]
+            DATA.mkdir(exist_ok=True)
+            log = DATA / "game.log"
             try:
-                _proc = subprocess.Popen(cmd, cwd=str(GAME))
+                with open(log, "wb") as out:               # the game's own error messages, kept for this check
+                    _proc = subprocess.Popen(cmd, cwd=str(GAME), stdout=out, stderr=subprocess.STDOUT)
             except OSError as e:
                 return self._json({"error": f"could not start the game: {e}"}, 500)
+            time.sleep(1.0)                                # a game that cannot start stops straight away
+            if _proc.poll() is not None:
+                lines = [l.strip() for l in log.read_text(encoding="utf-8", errors="replace").splitlines() if l.strip()]
+                return self._json({"error": "The game stopped as it started: " + (lines[-1] if lines else f"exit code {_proc.returncode}")}, 500)
         return self._json({"ok": True})
 
     def _stop(self):

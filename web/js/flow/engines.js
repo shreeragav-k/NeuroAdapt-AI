@@ -9,6 +9,7 @@
 import {
   GROUPS, WORD_LISTS, FOILS, OPPOSITES, LOOKALIKE_DIGITS, NAMES, GREEK, SYLLOGISMS, STORIES, ANALOGIES,
 } from "./data.js";
+import { sessionPlay } from "./fruitcatcher.js";
 import { pictureSvg, ANIMALS, FRUITS, VEHICLES, THINGS, ALL_PICTURES, PICTURE_SETS } from "./art.js";
 
 // -------------------------------------------------------------- small helpers
@@ -698,6 +699,17 @@ E.reaction = ({ tier, rng, content }) => ({
   },
 });
 
+
+// Fruit Catcher is a movement game: it has its own player (fruitgame.js) and scores itself, so the trial
+// here only tells the screen which round to play. One round, 30 / 45 / 60 s by level.
+E.fruit = ({ tier, mode }) => ({
+  rounds: { test: 1, session: 1 },
+  trial() {
+    const level = String(mode).split("-")[1];
+    if (!["easy", "medium", "hard"].includes(level)) throw new Error("fruit: " + mode);
+    return { kind: "movement", level, ...sessionPlay(level, tier) };
+  },
+});
 
 // -------------------------------------------------------------------- public
 export function makeGame(game, rng = Math.random) {

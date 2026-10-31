@@ -50,7 +50,7 @@ const G1 = {
     ["t5", "sequence", "animals", "", "Animal Echo", "Short-term memory", 5, "Watch the animals light up and sing. Then tap them in the same order."],
   ],
   easy: [
-    ["e01", "match", "pictures", "", "Picture Twins", "Visual perception", 1, "Tap the picture that is the same as the big one."],
+    ["e01", "fruit", "lanes", "g1-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. You have 3 lives and 30 seconds."],
     ["e02", "search", "fruits", "", "Find the Apples", "Selective attention", 2, "Tap every apple. Leave everything else alone."],
     ["e03", "series", "animals", "", "Animal Train", "Pattern reasoning", 3, "Look at the animal pattern and tap the animal that comes next."],
     ["e04", "order", "numbers", "", "Number Walk", "Attention and sequencing", 4, "Tap the numbers in order: 1, 2, 3 and on."],
@@ -62,7 +62,7 @@ const G1 = {
     ["e10", "sequence", "fruits", "", "Fruit Echo", "Short-term memory", 10, "Watch the fruit light up and play a note. Tap them in the same order."],
   ],
   medium: [
-    ["m01", "timing", "bar", "", "Stop the Bus", "Timing", 1, "Tap to stop the bus when it is on the green stop."],
+    ["m01", "fruit", "lanes", "g1-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. You have 3 lives and 45 seconds."],
     ["m02", "odd", "size", "", "Odd Size Out", "Visual attention", 2, "One picture is a different size. Tap it."],
     ["m03", "gonogo", "vehicles", "", "Bus or Car", "Response inhibition", 3, "Tap the bus. Wait for the other vehicles."],
     ["m04", "order", "size", "", "Small to Big", "Attention and sequencing", 4, "Tap the circles from the smallest to the biggest."],
@@ -74,7 +74,7 @@ const G1 = {
     ["m10", "delayed", "animals", "", "Remember and Wait", "Delayed memory", 10, "Look at the animals. Count while you wait. Then tap the one you saw."],
   ],
   hard: [
-    ["h01", "compare", "glance", "", "Quick Glance", "Short-term memory", 1, "Two groups flash for a moment. Tap the side that had more."],
+    ["h01", "fruit", "lanes", "g1-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it speeds up. 3 lives and 60 seconds."],
     ["h02", "series", "tinted", "", "Double Train", "Pattern reasoning", 2, "The animal and its colour follow a pattern. Tap what comes next."],
     ["h03", "search", "conjunction", "", "Find the Red Fish", "Selective attention", 3, "Tap every red fish. Not the blue fish, not the red birds."],
     ["h04", "switch", "animalcolor", "", "Colour or Animal", "Mental flexibility", 4, "Follow the rule at the top. It changes, so read it each time."],
@@ -96,7 +96,7 @@ const G2 = {
     ["t5", "series", "number", "", "Number Pattern", "Pattern reasoning", 5, "Find the rule and choose the next number."],
   ],
   easy: [
-    ["e01", "odd", "things", "", "Odd Object Out", "Visual attention", 1, "One picture is different from the others. Tap it."],
+    ["e01", "fruit", "lanes", "g2-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. You have 3 lives and 30 seconds."],
     ["e02", "order", "countdown", "", "Count Down", "Attention and sequencing", 2, "Tap the numbers backwards, from the biggest to 1."],
     ["e03", "gonogo", "digit", "", "Even Numbers Only", "Response inhibition", 3, "Tap even numbers. Do not tap odd numbers."],
     ["e04", "mirror", "mirror", "", "Mirror Image", "Spatial reasoning", 4, "Choose the pattern that is the mirror image."],
@@ -108,7 +108,7 @@ const G2 = {
     ["e10", "delayed", "letters", "", "Letters After a Pause", "Delayed memory", 10, "Study the letters. Count backwards while you wait. Then pick a letter you saw."],
   ],
   medium: [
-    ["m01", "search", "digits", "", "Number Hunt", "Selective attention", 1, "Tap every number 7. Ignore the other numbers."],
+    ["m01", "fruit", "lanes", "g2-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. You have 3 lives and 45 seconds."],
     ["m02", "stroop", "color", "", "Ink Colour", "Response inhibition", 2, "Tap the COLOUR the word is written in, not what it says."],
     ["m03", "switch", "parity", "", "Odd, Even, Big, Small", "Mental flexibility", 3, "Follow the rule at the top. It changes, so read it each time."],
     ["m04", "mirror", "rotate", "", "Turn It Around", "Spatial reasoning", 4, "Choose the pattern after it is turned a quarter turn clockwise."],
@@ -120,7 +120,7 @@ const G2 = {
     ["m10", "span", "revdigits", "", "Digits Backwards", "Working memory", 10, "Watch the numbers, then tap them in REVERSE order."],
   ],
   hard: [
-    ["h01", "flanker", "arrows", "", "Arrow Focus", "Selective attention", 1, "Choose the direction of the middle arrow only."],
+    ["h01", "fruit", "lanes", "g2-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it speeds up. 3 lives and 60 seconds."],
     ["h02", "symbolcode", "digits", "", "Symbol Code", "Processing speed", 2, "Use the key to find the number for each symbol."],
     ["h03", "logic", "order", "", "Who Is Tallest", "Logical reasoning", 3, "Read the clues and work out who it is."],
     ["h04", "route", "arrows", "", "Map Moves", "Spatial working memory", 4, "Follow the arrows from the start square and say where you finish."],
@@ -142,7 +142,7 @@ const G3 = {
     ["t5", "delayed", "words", "", "Delayed Word Recall", "Delayed memory", 5, "Study the words. Count backwards while you wait. Then pick a word you saw."],
   ],
   easy: [
-    ["e01", "odd", "rotation", "", "Tilted One Out", "Visual attention", 1, "One shape is turned differently. Tap it."],
+    ["e01", "fruit", "lanes", "g3-easy", "Fruit Catcher", "Response inhibition", 1, "Move to catch the falling fruit. Let the chocolate fall past. You have 3 lives and 30 seconds."],
     ["e02", "gonogo", "wordcategory", "", "Animals Only", "Response inhibition", 2, "Tap the animal words. Do not tap any other word."],
     ["e03", "mirror", "flip", "", "Flip Check", "Spatial reasoning", 3, "Choose the pattern after it is flipped upside down."],
     ["e04", "series", "numberalt", "", "Two-Track Series", "Pattern reasoning", 4, "Two rules alternate. Choose the next number."],
@@ -154,7 +154,7 @@ const G3 = {
     ["e10", "story", "news", "", "Short Story Recall", "Episodic memory", 10, "Read the short news item. Then answer a question about it."],
   ],
   medium: [
-    ["m01", "flanker", "letters", "", "Letter Flanker", "Selective attention", 1, "Choose the middle letter only."],
+    ["m01", "fruit", "lanes", "g3-medium", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate. It falls faster now. You have 3 lives and 45 seconds."],
     ["m02", "switch", "letternumber", "", "Letter or Number", "Mental flexibility", 2, "Follow the rule at the top. It changes, so read it each time."],
     ["m03", "logic", "syllogism", "", "Valid Conclusion", "Logical reasoning", 3, "Choose the statement that must be true."],
     ["m04", "mirror", "mentalrotation", "", "Mental Rotation", "Spatial reasoning", 4, "Choose the pattern that is the same shape, just turned."],
@@ -166,7 +166,7 @@ const G3 = {
     ["m10", "nback", "position", "", "Position One-Back", "Working memory", 10, "Is this square in the same place as the one just before?"],
   ],
   hard: [
-    ["h01", "timing", "dot", "", "Stop in the Zone", "Timing", 1, "Tap to stop the moving dot inside the green zone."],
+    ["h01", "fruit", "lanes", "g3-hard", "Fruit Catcher", "Response inhibition", 1, "Catch the fruit, dodge the chocolate, and keep up as it speeds up. 3 lives and 60 seconds."],
     ["h02", "symbolcode", "reverse", "", "Reverse Code", "Processing speed", 2, "Use the key to find the symbol for each letter."],
     ["h03", "analogy", "abstract", "", "Relationship Analogies", "Abstract reasoning", 3, "Find the word that completes the pair in the same way."],
     ["h04", "arith", "serial", "", "Serial Subtraction", "Working memory", 4, "Keep subtracting by the same amount. Choose the next number."],
@@ -183,13 +183,13 @@ const SOURCE = { g1: G1, g2: G2, g3: G3 };
 
 // The classic cognitive task behind each kind of game, and what it trains (shown before every game).
 export const TASK_INFO = {
+  fruit: ["Go / No-Go with movement", "Response inhibition and attention: acting on the fruit, holding back from the chocolate, and moving the whole body to meet what falls. Played with your hand in front of the camera, the arrow keys or a finger."],
   reaction: ["Simple reaction time", "How fast you notice and respond. Speed of processing underlies every other skill."],
   odd: ["Visual discrimination", "Spotting what differs, which sharpens attention to detail."],
   gonogo: ["Go / No-Go task", "Response inhibition: acting on cue and holding back on cue, the basis of self-control."],
   recall: ["Recognition memory", "Encoding what you see and recognising it once it has disappeared."],
   sequence: ["Corsi / Simon sequence task", "Short-term memory for order: hold a sequence in mind and repeat it."],
   span: ["Span task", "Working memory: keep items in mind in order, sometimes re-ordering them. The classic digit-span test."],
-  match: ["Visual matching", "Perceiving and comparing pictures accurately."],
   search: ["Visual search / cancellation", "Selective attention: finding targets among distractors."],
   series: ["Pattern completion", "Fluid reasoning: finding the rule and applying it to what comes next."],
   order: ["Trail-making task", "Attention and mental sequencing, the basis of planning and flexibility."],
@@ -198,15 +198,12 @@ export const TASK_INFO = {
   basket: ["Multi-item recognition", "Holding several items at once and picking them out among look-alikes."],
   delayed: ["Delayed match-to-sample", "Keeping a memory alive through a distraction, as in everyday remembering."],
   grid: ["Visuospatial pattern memory", "Remembering and reproducing a pattern in space."],
-  timing: ["Timing / anticipation task", "Judging when to act, a core of sustained attention and motor control."],
   assoc: ["Paired-associate learning", "Linking two things so that one brings back the other; strongly tied to everyday memory."],
-  compare: ["Visual short-term memory", "Taking in a scene at a glance and judging it from memory."],
   switch: ["Task-switching", "Mental flexibility: shifting between rules and updating what you do."],
   nback: ["N-back task", "Updating working memory continuously, one of the most widely used working-memory tests."],
   story: ["Story recall", "Episodic memory: remembering the details of what you read or heard."],
   mirror: ["Mental transformation", "Imagining shapes mirrored, turned or flipped: visuospatial reasoning."],
   stroop: ["Stroop task", "Selective attention and inhibition: ignoring the automatic reading of a word."],
-  flanker: ["Flanker task", "Focusing on one item while ignoring distracting neighbours."],
   symbolcode: ["Symbol-digit coding", "Processing speed with a short-term memory load, a standard speed test."],
   route: ["Route following", "Spatial working memory: tracking where moves take you."],
   logic: ["Logical reasoning", "Drawing a firm conclusion from the information given."],
