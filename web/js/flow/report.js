@@ -1,5 +1,5 @@
 // Report pages. They read only the saved report, so an old report never changes.
-import { GROUPS, LEVEL_LABEL, RULES } from "./data.js";
+import { GROUPS, LEVEL_LABEL, RULES, bandLabel } from "./data.js";
 import { MEANINGFUL } from "./logic.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -11,7 +11,7 @@ const row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
 const who = (r) => `<div class="panel who-panel"><dl class="who">
   ${row("Name", esc(r.name))}
   ${row("Age", `${esc(r.age)} years`)}
-  ${row("Age group", esc(group(r.groupId).label))}
+  ${row("Group", esc(bandLabel(r.groupId, r.band)))}
   ${row("Health condition", r.condition ? esc(r.condition) : "Not applicable")}
   ${row("Date", esc(when(r.date)))}
   ${r.type === "daily" ? row("Session", `Day ${r.day}`) + row("Level played", LEVEL_LABEL[r.level]) : ""}
@@ -20,7 +20,7 @@ const who = (r) => `<div class="panel who-panel"><dl class="who">
 
 // ------------------------------------------------------------------ charts
 // Plain SVG, no library. Colours come from the page's CSS variables.
-const C = { teal: "var(--teal)", amber: "var(--amber)", grey: "#a9a392", ink: "var(--ink-3)", line: "var(--line)" };
+const C = { teal: "var(--teal)", amber: "var(--amber)", grey: "#9fb3c4", ink: "var(--ink-3)", line: "var(--line)" };
 
 // points: [{ label, sub, value }]   value 0..100
 export function lineChart(points, { title = "Accuracy over time" } = {}) {
@@ -132,7 +132,7 @@ function dailyCharts(r) {
 export function assessmentReport(r) {
   return `<article class="report">
   <header><div class="eyebrow">Initial assessment report</div><h1>${esc(r.name)}</h1>
-  <p class="lede">Five games chosen for ${esc(group(r.groupId).label.toLowerCase())}. This report shows where adaptive learning will begin.</p></header>
+  <p class="lede">Five games chosen for you (${esc(bandLabel(r.groupId, r.band))}). This report shows where adaptive learning will begin.</p></header>
   ${who(r)}
   <div class="stats">
     <div><b>${r.overallAccuracy}%</b><span>Overall accuracy across the 5 games</span></div>

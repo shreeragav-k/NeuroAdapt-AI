@@ -1,0 +1,206 @@
+/* Halcyon theme: blue #2478E5, cyan #16C6D0, ice #DFF9FA.
+   A restrained, professional look: flat surfaces, thin borders, one accent colour, a sans-serif type scale.
+   Loaded after ui.css. It re-points the colour tokens every other rule uses; delete this file (and its <link>)
+   to go back to the original teal and cream. */
+
+:root {
+  --blue: #2478e5;
+  --blue-hover: #1c63c4;
+  --cyan: #16c6d0;
+  --ice: #dff9fa;
+  --navy: #0f2f5c;
+
+  --ivory: #f5f9fc;            /* page */
+  --paper: #ffffff;            /* surfaces */
+  --stone: #eaf1f6;            /* quiet fills */
+  --line: #d3e0e9;             /* borders */
+  --line-soft: #e4edf3;
+  --ink: #0f2742;              /* text */
+  --ink-2: #3f566d;
+  --ink-3: #6b8196;
+  --teal: #2478e5;             /* primary (token name kept so every old rule follows) */
+  --teal-deep: #1c63c4;
+  --teal-pale: #e4f0fd;
+  --amber: #16c6d0;
+  --bad: #c93c3c;
+  --r: 10px;
+  --shadow: 0 1px 2px rgba(15, 39, 66, .06), 0 6px 18px -12px rgba(15, 39, 66, .18);
+  --shadow-sm: 0 1px 2px rgba(15, 39, 66, .05);
+  --shadow-md: 0 2px 4px rgba(15, 39, 66, .06), 0 12px 24px -14px rgba(15, 39, 66, .22);
+  --serif: "Hanken Grotesk", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif;   /* one family for everything */
+  --a-memory: #2478e5; --a-attention: #16a9b3; --a-reasoning: #4a6fe0; --a-flexible-thinking: #1f9d8f;
+  --a-spatial-thinking: #0f8fbf; --a-self-control: #7a5be0; --a-social-thinking: #d4578a; --a-processing-speed: #e0803a;
+}
+
+body { background: var(--ivory); color: var(--ink); font-size: 1rem; line-height: 1.6; }
+h1, h2, h3, h4 { font-family: var(--serif); font-weight: 650; letter-spacing: -.02em; line-height: 1.15; font-variation-settings: normal; }
+h1 em, h2 em { font-style: normal; }
+::selection { background: var(--ice); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+.eyebrow { color: var(--blue); font-size: .78rem; font-weight: 700; letter-spacing: .1em; }
+.lede { color: var(--ink-2); }
+
+/* ------------------------------------------------------------ top bar */
+.appbar { background: #fff; border-bottom: 1px solid var(--line); backdrop-filter: none; }
+.appbar .brand b { font-family: var(--serif); font-weight: 700; letter-spacing: -.02em; font-size: 1.3rem; }
+.appbar .brand i { color: var(--ink-3); font-weight: 600; letter-spacing: .12em; }
+.topnav a { border-radius: 8px; font-weight: 600; color: var(--ink-2); }
+.topnav a:hover { background: var(--stone); color: var(--ink); }
+.topnav a[aria-current="page"] { background: var(--teal-pale); color: var(--blue-hover); }
+.userchip { border: 1px solid var(--line); background: #fff; }
+.avatar { background: var(--blue); }
+
+/* ------------------------------------------------------------ surfaces */
+.card, .kpi, .chartbox, .taskcard, .suglist li, .grow, .rrow, .verdict, .notice, .banner, dialog {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow);
+}
+.card:hover { transform: none; border-color: var(--line); }
+.card-head h2, .card-head h3 { font-weight: 650; font-size: 1.15rem; }
+.kpi { border-top: 3px solid var(--blue); }
+.kpi:nth-child(even) { border-top-color: var(--cyan); }
+.kpi .k-val { font-family: var(--serif); font-weight: 700; color: var(--ink); letter-spacing: -.02em; }
+.kpi .k-top { font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
+.kpi .k-top .ic { color: var(--blue); }
+.notice, .banner { background: var(--teal-pale); border-color: #c4dcf7; box-shadow: none; }
+.verdict { box-shadow: none; }
+.empty { border: 1px dashed var(--line); border-radius: var(--r); background: #fff; }
+
+/* ------------------------------------------------------------ buttons */
+.btn {
+  --bg: var(--blue); --fg: #fff;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--bg); border-radius: 8px;
+  font-weight: 600; letter-spacing: 0; box-shadow: none; transition: background .15s, border-color .15s, box-shadow .15s;
+}
+.btn:hover { --bg: var(--blue-hover); transform: none; box-shadow: 0 1px 2px rgba(15, 39, 66, .15); }
+.btn:active { transform: none; box-shadow: none; }
+.btn.secondary { --bg: #fff; --fg: var(--ink); border: 1px solid var(--line); }
+.btn.secondary:hover { --bg: var(--stone); --fg: var(--ink); border-color: #b9cbd8; }
+.btn.quiet { --bg: transparent; --fg: var(--ink-2); border: 1px solid var(--line); box-shadow: none; }
+.btn.quiet:hover { --bg: var(--stone); --fg: var(--ink); }
+.btn.danger { --bg: #fff; --fg: var(--bad); border: 1px solid #efc3c3; box-shadow: none; }
+.btn.danger:hover { --bg: var(--bad); --fg: #fff; border-color: var(--bad); }
+.btn.lg { min-height: 3rem; padding: .7rem 1.6rem; font-size: 1rem; }
+.linkbtn { color: var(--blue-hover); }
+
+/* ------------------------------------------------------------ status elements */
+.chip, .badge { border-radius: 6px; font-weight: 600; box-shadow: none; border: 0; }
+.badge { background: var(--teal-pale); color: var(--blue-hover); }
+.badge.easy { background: #dcf5ee; color: #0b6b5e; }
+.badge.medium { background: #fff1cc; color: #7a5a00; }
+.badge.hard { background: #fde4e1; color: #a43328; }
+.progressbar { height: 8px; border-radius: 99px; background: var(--stone); border: 0; box-shadow: none; }
+.progressbar i { background: var(--blue); border-radius: 99px; box-shadow: none; }
+.journey .dot { border: 1.5px solid var(--line); background: #fff; }
+.journey li.done .dot { background: var(--blue); border-color: var(--blue); }
+.journey li.done + li::before, .journey li.current::before { background: var(--blue); }
+.journey li.current .dot { border-color: var(--blue); color: var(--blue-hover); box-shadow: 0 0 0 4px var(--teal-pale); }
+
+/* ------------------------------------------------------------ forms */
+.fgroup label { font-weight: 600; font-size: .92rem; }
+.fgroup input[type=text], .fgroup input[type=password], .fgroup input[type=email], input[type=text], input[type=password], input[type=email], select, textarea {
+  border: 1px solid #b9cbd8; border-radius: 8px; background: #fff; box-shadow: none; min-height: 2.9rem;
+}
+.fgroup input:hover { border-color: #8fa8bb; }
+.fgroup input:focus, input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(36, 120, 229, .18); }
+.form-err { border-radius: 8px; background: #fdecea; color: #8e2f2a; border: 1px solid #f3c6c2; }
+.pwwrap button { border-radius: 6px; }
+
+/* ------------------------------------------------------------ login */
+.auth { min-height: calc(100vh - 4.1rem); background: #fff; }
+.brandpanel { background: var(--navy); color: #e6eef8; padding: clamp(2rem, 5vw, 4.5rem); }
+.brandpanel h1 { color: #fff; font-weight: 700; font-size: clamp(2rem, 3.4vw, 3rem); letter-spacing: -.03em; line-height: 1.1; max-width: 16ch; }
+.brandpanel h1 em { color: #7fe3ea; }
+.brandpanel .lede { color: #b9cbe0; font-size: 1.08rem; max-width: 30rem; }
+.brandpanel .eyebrow { color: #7fe3ea; }
+.brandpanel ul { gap: 1.4rem; margin-top: 2.4rem; padding-top: 2rem; border-top: 1px solid rgba(255, 255, 255, .14); }
+.brandpanel li { grid-template-columns: 2.5rem 1fr; }
+.brandpanel li .ic-wrap { width: 2.5rem; height: 2.5rem; border-radius: 8px; background: transparent; border: 1px solid rgba(255, 255, 255, .28); color: #7fe3ea; }
+.brandpanel li b { color: #fff; font-weight: 650; }
+.brandpanel li span { color: #aebfd4; font-size: .96rem; }
+.brandpanel .groups { gap: .5rem; }
+.brandpanel .groups span { border: 1px solid rgba(255, 255, 255, .25); border-radius: 6px; color: #cddbea; font-size: .88rem; padding: .25rem .7rem; }
+
+.authside { background: #fff; padding: clamp(1.6rem, 4vw, 4rem); }
+.authcard { width: min(100%, 26rem); background: transparent; border: 0; box-shadow: none; padding: 0; }
+.authcard h2 { font-size: 1.9rem; font-weight: 700; letter-spacing: -.025em; margin-bottom: .45rem; }
+.authcard .sub { color: var(--ink-2); margin-bottom: 1.8rem; }
+.seg { background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0; margin-bottom: 1.6rem; box-shadow: none; gap: 0; }
+.seg button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -1px; background: none; padding: .7rem .5rem; font-weight: 600; color: var(--ink-3); box-shadow: none; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-selected="true"] { background: none; color: var(--blue-hover); border-bottom-color: var(--blue); box-shadow: none; }
+.authcard .btn.lg { width: 100%; }
+.fineprint { color: var(--ink-3); font-size: .88rem; }
+@media (max-width: 900px) { .brandpanel { padding: 1.6rem 1.2rem 1.8rem; } }
+
+/* ------------------------------------------------------------ guide bot */
+.halo-point { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 10px; animation: halo-glow 1.4s ease-in-out infinite; }
+@keyframes halo-glow { 50% { box-shadow: 0 0 0 8px rgba(22, 198, 208, .22); } }
+.halo3d-bubble { background: #fff; border: 1px solid var(--line); border-radius: 12px 12px 12px 4px; box-shadow: var(--shadow-md); }
+.halo3d-bubble p { font-weight: 500; font-size: .95rem; }
+.halo-wake { border: 1px solid var(--line); color: var(--ink-2); box-shadow: var(--shadow); }
+
+/* "how do you like to learn" choice, shown at sign-up only for ages above the last age band */
+.thinking { border: 0; padding: 0; margin: 0 0 1.05rem; min-width: 0; }
+.thinking[hidden] { display: none; }
+.thinking legend { font-weight: 600; font-size: .92rem; padding: 0; margin-bottom: .5rem; }
+.thinkopt { display: flex; gap: .7rem; align-items: flex-start; padding: .65rem .8rem; border: 1px solid var(--line); border-radius: 8px; margin-bottom: .5rem; cursor: pointer; background: #fff; }
+.thinkopt:hover { border-color: #8fa8bb; }
+.thinkopt:has(input:checked) { border-color: var(--blue); background: var(--teal-pale); }
+.thinkopt input { margin-top: .25rem; accent-color: var(--blue); min-height: 0; }
+.thinkopt b { display: block; font-weight: 650; }
+.thinkopt small { display: block; color: var(--ink-2); font-size: .86rem; line-height: 1.35; }
+
+/* ------------------------------------------------------------ reports
+   The report itself is not a card (it is the page). Inside it: a header band, a details panel, a figures strip,
+   tables with ruled rows, and plain text sections separated by whitespace. */
+.report { background: none; border: 0; box-shadow: none; border-radius: 0; padding: 0; max-width: 62rem; margin: 0 auto; }
+.report > header { background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 8px; box-shadow: none; padding: 1.6rem 1.8rem; margin-bottom: 1.25rem; }
+.report > header .eyebrow { margin-bottom: .5rem; }
+.report > header h1 { font-size: clamp(1.7rem, 3.4vw, 2.3rem); font-weight: 700; letter-spacing: -.025em; margin: 0 0 .4rem; }
+.report > header .lede { font-size: 1rem; color: var(--ink-2); max-width: 48rem; margin: 0; }
+
+.report .who-panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: none; padding: 1.2rem 1.5rem; margin-bottom: 1.25rem; }
+.report .who { gap: 1rem 2rem; }
+.report .who dt { font-size: .72rem; font-weight: 700; letter-spacing: .1em; color: var(--ink-3); }
+.report .who dd { margin: .15rem 0 0; font-family: var(--serif); font-size: 1.02rem; font-weight: 600; color: var(--ink); }
+
+.report .stats { background: var(--line); border: 1px solid var(--line); border-radius: 8px; box-shadow: none; gap: 1px; margin-bottom: 1.5rem; overflow: hidden; }
+.report .stats > div { background: #fff; padding: 1.1rem 1.4rem; }
+.report .stats b { font-family: var(--serif); font-size: 2rem; font-weight: 700; letter-spacing: -.02em; color: var(--navy); margin-bottom: .25rem; }
+.report .stats span { font-size: .88rem; color: var(--ink-2); }
+
+.report h2 { font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em; margin: 2rem 0 .75rem; padding-bottom: .5rem; border-bottom: 1px solid var(--line); color: var(--ink); }
+.report .prose-p { max-width: 48rem; font-size: .98rem; color: var(--ink-2); }
+
+.report .tablewrap { background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: none; padding: 0; overflow: auto; }
+.report table { font-size: .93rem; }
+.report th { background: var(--stone); color: var(--ink-2); font-size: .72rem; font-weight: 700; letter-spacing: .08em; padding: .7rem 1rem; border-bottom: 1px solid var(--line); }
+.report td { padding: .75rem 1rem; border-bottom: 1px solid var(--line-soft); color: var(--ink); }
+.report tbody tr:last-child td { border-bottom: 0; }
+.report tbody tr:hover td { background: #f8fbfd; }
+
+.report .chartbox { padding: 1rem 1.2rem; border-radius: 8px; box-shadow: none; }
+.report .plan { margin: .5rem 0 1.5rem; border-top: 0; }
+.report .plan li { padding: .7rem .25rem; }
+.report .plan li b { font-family: var(--serif); font-weight: 650; font-size: 1rem; }
+.report .legal-note { max-width: none; margin-top: 2.5rem; font-size: .84rem; }
+.report-actions { max-width: 62rem; margin-left: auto; margin-right: auto; }
+@media (max-width: 640px) { .report > header { padding: 1.2rem; } .report .stats b { font-size: 1.6rem; } }
+@media print { .report > header, .report .who-panel, .report .tablewrap { border-color: #bbb; } }
+
+
+/* date of birth: three dropdowns that look like the other fields */
+.dobrow { display: grid; grid-template-columns: minmax(4.5rem, .7fr) minmax(0, 1.5fr) minmax(5.5rem, 1fr); gap: .5rem; }
+.dobrow select {
+  appearance: none; -webkit-appearance: none; width: 100%; min-height: 2.9rem; padding: .6rem 2rem .6rem .85rem; font: inherit; color: var(--ink);
+  border: 1px solid #b9cbd8; border-radius: 8px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%233f566d' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right .8rem center;
+  cursor: pointer; text-overflow: ellipsis;
+}
+.dobrow select:hover { border-color: #8fa8bb; }
+.dobrow select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(36, 120, 229, .18); }
+.dobrow select:invalid, .dobrow select:has(option[value=""]:checked) { color: var(--ink-3); }
+.dobrow option { color: var(--ink); }
+@media (max-width: 420px) { .dobrow { grid-template-columns: 1fr 1.6fr 1.1fr; gap: .4rem; } .dobrow select { padding-left: .6rem; } }
+
+/* the date of birth needs the full row so day, month and year stay readable */
+.fields-2:has(.dobrow) { grid-template-columns: 1fr; }

@@ -9,11 +9,32 @@
 //   hard      the 10 games suggested at the Hard level
 // 3 groups x (5 + 10 + 10 + 10) = 105 games. No game appears in two sets.
 
+// The three content sets (games). Who plays which set is decided by AUDIENCES / THINKING_LEVELS below.
 export const GROUPS = [
-  { id: "g1", tier: 0, min: 1,  max: 5,  label: "Ages 1 to 5",   name: "Little Explorers" },
-  { id: "g2", tier: 1, min: 6,  max: 17, label: "Ages 6 to 17",  name: "Young Learners" },
-  { id: "g3", tier: 2, min: 18, max: 60, label: "Ages 18 to 60", name: "Adult Minds" },
+  { id: "g1", tier: 0, label: "Little Explorers", name: "Little Explorers" },
+  { id: "g2", tier: 1, label: "Young Learners",   name: "Young Learners" },
+  { id: "g3", tier: 2, label: "Adult Minds",      name: "Adult Minds" },
 ];
+
+// Who plays which set, by age. `set` is the id of the content set above.
+export const AUDIENCES = [
+  { id: "a1", set: "g1", min: 1,  max: 5,  label: "Ages 1 to 5" },
+  { id: "a2", set: "g2", min: 6,  max: 12, label: "Ages 6 to 12" },
+  { id: "a3", set: "g2", min: 13, max: 18, label: "Ages 13 to 18" },
+  { id: "a4", set: "g3", min: 19, max: 25, label: "Ages 19 to 25" },
+];
+// Above the last age band the set is chosen by how the person thinks and learns (picked at sign-up), not by age.
+export const THINKING_LEVELS = [
+  { id: "l1", set: "g1", label: "Simple and playful",  help: "Short, gentle activities with pictures and animals." },
+  { id: "l2", set: "g2", label: "Everyday learning",   help: "Familiar memory and attention tasks at a comfortable pace." },
+  { id: "l3", set: "g3", label: "Advanced thinking",   help: "Longer, more demanding memory and reasoning tasks." },
+];
+export const MAX_BAND_AGE = AUDIENCES[AUDIENCES.length - 1].max;
+// The label shown for a player: their age band or thinking level, falling back to the content set's name.
+export function bandLabel(groupId, band) {
+  const b = AUDIENCES.find((a) => a.id === band) || THINKING_LEVELS.find((t) => t.id === band);
+  return b ? b.label : (GROUPS.find((g) => g.id === groupId) || {}).label || "";
+}
 
 export const LEVELS = ["easy", "medium", "hard"];
 export const LEVEL_LABEL = { easy: "Easy", medium: "Medium", hard: "Hard" };

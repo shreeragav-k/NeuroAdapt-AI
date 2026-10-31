@@ -13,11 +13,12 @@ const off = () => { try { return localStorage.getItem(KEY) === "1"; } catch { re
 const setOff = (v) => { try { localStorage.setItem(KEY, v ? "1" : "0"); } catch { /* storage blocked */ } };
 
 // ------------------------------------------------------------------ hints
-function hint(name, p) {
+function hint(name, p, ctx = {}) {
   const first = p ? p.name.trim().split(/\s+/)[0] : "";
   switch (name) {
-    case "login":
-      return { text: "Hi, I'm Halo! New here? Tap Create account. Already have one? Sign in with your email and password.", target: "#tab-new" };
+    case "login":      // follows whichever tab is open: the bot walks to that tab's button
+      if (ctx.mode === "create") return { text: "Great! Fill in your details, then tap Create account. Already have an account? Use the Sign in tab.", target: "#login button[type=submit]" };
+      return { text: "Hi, I'm Halo! Enter your email and password, then tap Sign in. New here? Choose the Create account tab.", target: "#login button[type=submit]" };
     case "test": {
       const total = L.testGames(p.groupId).length, done = p.test.done.length;
       if (done === 0) return { text: `Welcome, ${first}! First, a short 5-game warm-up. Tap Begin the assessment.`, target: "#b" };
@@ -31,6 +32,8 @@ function hint(name, p) {
       if (st === "resume") return { text: "You're part way through today. Tap Resume to carry on where you stopped.", target: "#start" };
       return { text: "Today's session is done. Amazing! Check your Reports, or try a suggested game. Come back tomorrow for the next level.", target: "#suggested a.btn, a[href='#/reports']" };
     }
+    case "dob":
+      return { text: "One quick thing: add your date of birth, then tap Continue. It keeps your age up to date.", target: "#dobf button[type=submit]" };
     case "session":
       return { text: "Play each game in order. Take a break whenever you need one.", target: null };
     case "reports":
@@ -60,7 +63,7 @@ async function loadThree() {
 function buildCharacter() {
   const T = THREE;
   const mat = (color, rough = .45) => new T.MeshStandardMaterial({ color, roughness: rough, metalness: .05 });
-  const teal = mat(0x2b8f89), tealDark = mat(0x1d504d), white = mat(0xf4fffb, .35), pink = mat(0xff8fb1, .6), sun = mat(0xffc83d, .3), ink = mat(0x14312f, .5);
+  const teal = mat(0x2478e5), tealDark = mat(0x1a5bb5), white = mat(0xdff9fa, .35), pink = mat(0xff8fb1, .6), sun = mat(0x16c6d0, .3), ink = mat(0x0e2a47, .5);
   const mesh = (geo, m, x = 0, y = 0, z = 0, parent) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); if (parent) parent.add(o); return o; };
   const grp = (x, y, z, parent) => { const g = new T.Group(); g.position.set(x, y, z); if (parent) parent.add(g); return g; };
 
@@ -294,10 +297,12 @@ function show(h) {
 }
 
 // Call after each screen is drawn.
-export function update(name, p) {
+export function update(name, p, ctx) {
   let h = null;
-  try { h = hint(name, p); } catch { h = null; }
+  try { h = hint(name, p, ctx); } catch { h = null; }
+  const same = h && current && h.text === current.text && h.target === current.target;
   current = h;
+  if (same && el.root && !el.root.hidden) { setTimeout(() => point(h.target), 60); return; }   // same tip redrawn: just re-point at the new button
   if (!el.root) build();
   if (!h) { el.root.hidden = true; clearPointer(); return; }
   if (off()) { el.root.hidden = true; clearPointer(); mountWake(); return; }

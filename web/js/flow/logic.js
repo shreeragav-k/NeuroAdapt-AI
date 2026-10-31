@@ -8,13 +8,17 @@
 // A profile is a plain object. Every function that changes a profile either
 // throws when the workflow would be broken or leaves the profile consistent.
 
-import { GROUPS, LEVELS, LEVEL_LABEL, RULES, BANDS, CATALOG, DOMAINS, domainOf, SUGGESTIONS, suggestionById, TASK_INFO } from "./data.js";
+import { GROUPS, AUDIENCES, THINKING_LEVELS, MAX_BAND_AGE, bandLabel, LEVELS, LEVEL_LABEL, RULES, BANDS, CATALOG, DOMAINS, domainOf, SUGGESTIONS, suggestionById, TASK_INFO } from "./data.js";
 
 // ------------------------------------------------------------------- groups
-export function groupForAge(age) {
-  if (!Number.isInteger(age)) return null;
-  return GROUPS.find((g) => age >= g.min && age <= g.max) || null;
+export const needsThinkingLevel = (age) => Number.isInteger(age) && age > MAX_BAND_AGE;
+// Up to the last age band the set follows the age; above it, the thinking level chosen at sign-up decides.
+export function groupForAge(age, thinking) {
+  if (!Number.isInteger(age) || age < 1 || age > 110) return null;
+  const pick = age <= MAX_BAND_AGE ? AUDIENCES.find((x) => age >= x.min && age <= x.max) : THINKING_LEVELS.find((x) => x.id === thinking);
+  return pick ? { ...GROUPS.find((g) => g.id === pick.set), band: pick.id, label: pick.label } : null;
 }
+export { bandLabel };
 export const groupById = (id) => GROUPS.find((g) => g.id === id) || null;
 
 // ---------------------------------------------------------------- accounts
@@ -22,22 +26,73 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const normEmail = (e) => String(e ?? "").trim().toLowerCase();
 export const PASSWORD_MIN = 8;
 
-function checkDetails({ name, age, condition }) {
+// ------------------------------------------------------------ date of birth
+// Dates are "YYYY-MM-DD" strings (what <input type="date"> gives). Age is always worked out from the birth date, so it moves on every birthday.
+const DOB = /^(\d{4})-(\d{2})-(\d{2})$/;
+export function parseDay(s) {
+  const m = DOB.exec(String(s ?? "").trim());
+  if (!m) return null;
+  const y = +m[1], mo = +m[2], d = +m[3], t = new Date(y, mo - 1, d);
+  return t.getFullYear() === y && t.getMonth() === mo - 1 && t.getDate() === d ? { y, mo, d } : null;
+}
+// Whole years lived on `day`.
+export function ageOn(dob, day) {
+  const b = parseDay(dob), t = parseDay(day);
+  if (!b || !t) return null;
+  return t.y - b.y - (t.mo < b.mo || (t.mo === b.mo && t.d < b.d) ? 1 : 0);
+}
+export function validateDob(dob, today = dayKey()) {
+  if (!parseDay(dob)) return { error: "Please enter your date of birth." };
+  const age = ageOn(dob, today);
+  if (age < 0) return { error: "The date of birth cannot be in the future." };
+  if (age < 1 || age > 110) return { error: "Please check the date of birth." };
+  return { dob: String(dob).trim(), age };
+}
+// Keeps age, age band and game set in step with the birth date. Called whenever a profile is opened.
+// Moving into a new group keeps the level and every report; only a half-played session (from the old group's games) is dropped.
+export function syncAge(p, today = dayKey()) {
+  if (!p.dob) return false;
+  const age = ageOn(p.dob, today);
+  if (age === null || age < 1) return false;
+  let changed = p.age !== age;
+  p.age = age;
+  let g = groupForAge(age, p.thinking);
+  if (!g && needsThinkingLevel(age)) {          // passed the last age band: same kind of games, now named by thinking level
+    const t = THINKING_LEVELS.find((x) => x.set === p.groupId);
+    if (t) { p.thinking = t.id; g = groupForAge(age, t.id); }
+  }
+  if (g && (g.id !== p.groupId || g.band !== p.band)) {
+    if (g.id !== p.groupId) p.current = null;
+    p.groupId = g.id; p.band = g.band; changed = true;
+  }
+  return changed;
+}
+
+function checkDetails({ name, age, dob, condition, thinking }, today = dayKey()) {
   const n = String(name ?? "").replace(/\s+/g, " ").trim();
   if (!n) return { error: "Please enter a name." };
   if (n.length > 40) return { error: "Please use a name of 40 characters or fewer." };
-  const raw = String(age ?? "").trim();
-  if (!/^\d+$/.test(raw)) return { error: "Please enter the age as a whole number." };
-  const a = Number(raw);
-  const group = groupForAge(a);
-  if (!group) return { error: `Ages ${GROUPS[0].min} to ${GROUPS[GROUPS.length - 1].max} are supported.` };
+  let a, birth = null;
+  if (dob !== undefined) {                       // normal path: the age comes from the birth date
+    const v = validateDob(dob, today);
+    if (v.error) return v;
+    a = v.age; birth = v.dob;
+  } else {                                       // age given directly (kept for older callers)
+    const raw = String(age ?? "").trim();
+    if (!/^\d+$/.test(raw)) return { error: "Please enter your date of birth." };
+    a = Number(raw);
+    if (a < 1 || a > 110) return { error: "Please enter a valid age." };
+  }
+  if (needsThinkingLevel(a) && !THINKING_LEVELS.some((t) => t.id === thinking)) return { error: "Please choose the option that describes how you like to learn." };
+  const group = groupForAge(a, thinking);
+  if (!group) return { error: "Please enter a valid age." };
   const c = String(condition ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
-  return { name: n, age: a, group, condition: c };
+  return { name: n, age: a, dob: birth, group, condition: c, thinking: needsThinkingLevel(a) ? thinking : null };
 }
 
 // Create-account form. The age group is fixed from this age for the life of the account.
-export function validateSignup({ name, age, condition, email, password, confirm }) {
-  const d = checkDetails({ name, age, condition });
+export function validateSignup({ name, age, dob, condition, thinking, email, password, confirm }) {
+  const d = checkDetails({ name, age, dob, condition, thinking });
   if (d.error) return d;
   const em = normEmail(email);
   if (!EMAIL.test(em) || em.length > 120) return { error: "Please enter a valid email address." };
@@ -168,9 +223,9 @@ export function recordExtra(p, id, trials, date) {
 
 // --------------------------------------------------------------- the profile
 // One profile per account. `id` is the account id (Firebase uid, or a local id).
-export function newProfile({ name, age, group, condition, email = "" }, id, now = new Date().toISOString()) {
+export function newProfile({ name, age, dob = null, thinking = null, group, condition, email = "" }, id, now = new Date().toISOString()) {
   return {
-    key: id, email, name, age, groupId: group.id, condition,
+    key: id, email, name, age, dob, thinking, groupId: group.id, band: group.band, condition,
     created: now,
     test: { done: [], completed: false },
     assessmentViewed: false,
@@ -213,7 +268,7 @@ function finishTest(p, date) {
   const level = levelFromAbility(ability);
   const report = {
     id: "assessment", type: "assessment", date,
-    name: p.name, age: p.age, groupId: p.groupId, condition: p.condition,
+    name: p.name, age: p.age, groupId: p.groupId, band: p.band, condition: p.condition,
     games: rows, overallAccuracy: overall, ability, level,
     domains: domainScores(rows),
     plan: levelGames(p.groupId, level).map(({ id, title, skill }) => ({ id, title, skill })),
@@ -312,7 +367,7 @@ function finishSession(p) {
   };
   const report = {
     id: `day-${n}`, type: "daily", day: n, date: cur.date,
-    name: p.name, age: p.age, groupId: p.groupId, condition: p.condition,
+    name: p.name, age: p.age, groupId: p.groupId, band: p.band, condition: p.condition,
     level: cur.level, games, accuracy,
     previous: prevAny ? { day: prevAny.n, date: prevAny.date, level: prevAny.level, accuracy: prevAny.accuracy } : null,
     previousSameLevel: prevSame ? { day: prevSame.n, accuracy: prevSame.accuracy } : null,

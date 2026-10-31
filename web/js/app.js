@@ -5,7 +5,7 @@
 // A player can only be on the screen that matches their stage; anything else
 // redirects (see `allowed`).
 import * as S from "./flow/storage.js";
-import { GROUPS, LEVEL_LABEL, BANDS, RULES, DOMAINS, domainOf } from "./flow/data.js";
+import { GROUPS, THINKING_LEVELS, LEVEL_LABEL, BANDS, RULES, DOMAINS, domainOf, bandLabel } from "./flow/data.js";
 import * as Sound from "./flow/sound.js";
 import * as L from "./flow/logic.js";
 import { playGame, shapeSvg } from "./flow/play.js";
@@ -32,7 +32,7 @@ let stopGame = null, fruitGame = null;
 
 const nav = (h) => { if (location.hash === h) route(); else location.hash = h; };
 const setMain = (html) => { $main.innerHTML = html; window.scrollTo({ top: 0 }); };
-const groupOf = (p) => GROUPS.find((g) => g.id === p.groupId);
+const groupOf = (p) => ({ ...GROUPS.find((g) => g.id === p.groupId), label: bandLabel(p.groupId, p.band) });
 const initials = (name) => (String(name).trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("") || "?").toUpperCase();
 const slug = (skill) => (domainOf(skill) || "other").toLowerCase().replace(/[^a-z]+/g, "-");
 const areaSlug = (area) => area.toLowerCase().replace(/[^a-z]+/g, "-");
@@ -80,10 +80,11 @@ if (Cloud.enabled) {
 }
 
 // ------------------------------------------------------------------- router
-const canonical = (p) => (!p ? "#/login" : { test: "#/test", assessment: "#/assessment", learning: "#/plan" }[L.stageOf(p)]);
+const canonical = (p) => (!p ? "#/login" : !p.dob ? "#/dob" : { test: "#/test", assessment: "#/assessment", learning: "#/plan" }[L.stageOf(p)]);
 function allowed(name, p) {
   if (name === "privacy") return true;
   if (!p) return name === "login";
+  if (!p.dob) return name === "dob";            // accounts made before birth dates were collected add theirs first
   const stage = L.stageOf(p);
   if (stage === "test") return name === "test";
   if (stage === "assessment") return name === "assessment";
@@ -95,18 +96,51 @@ function route() {
   if (fruitGame) { fruitGame.destroy(); fruitGame = null; }
   const [, name = "login", arg] = (location.hash.slice(1) || "/login").split("/");
   const p = S.active();
+  if (p && L.syncAge(p, S.today())) S.save();   // age (and age group) follow the birth date
   if (!allowed(name, p)) { const to = canonical(p); if (location.hash !== to) { location.hash = to; return; } }
   const stage = p ? L.stageOf(p) : null;
   renderNav(p, stage, name);
-  const view = { login: viewLogin, test: viewTest, assessment: viewAssessment, plan: viewPlan, session: viewSession, reports: viewReports, report: viewReport, extra: viewExtra, privacy: viewPrivacy }[name];
+  const view = { login: viewLogin, dob: viewDob, test: viewTest, assessment: viewAssessment, plan: viewPlan, session: viewSession, reports: viewReports, report: viewReport, extra: viewExtra, privacy: viewPrivacy }[name];
   if (!view) return nav(canonical(p));
-  setTitle({ login: "Sign in", test: "Assessment", assessment: "Assessment report", plan: "Your plan", session: "Daily session", reports: "Reports", report: "Report", extra: "Suggested game", privacy: "Privacy and camera" }[name]);
+  setTitle({ login: "Sign in", dob: "Date of birth", test: "Assessment", assessment: "Assessment report", plan: "Your plan", session: "Daily session", reports: "Reports", report: "Report", extra: "Suggested game", privacy: "Privacy and camera" }[name]);
   view(p, arg);
-  Guide.update(name, p);
+  Guide.update(name, p, { mode });
 }
 
 // -------------------------------------------------------------------- sign in
 let mode = "signin";
+// ---------------------------------------------------------- date of birth field
+// Three dropdowns (day, month, year) that fill one hidden #dob value as "YYYY-MM-DD", so the field matches the rest of the form
+// instead of the browser's own date picker. #dob stays empty until all three are chosen.
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function dobField() {
+  const year = new Date().getFullYear();
+  const opts = (items, first) => `<option value="" disabled selected>${first}</option>${items.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}`;
+  const days = Array.from({ length: 31 }, (_, i) => [i + 1, i + 1]);
+  const months = MONTHS.map((m, i) => [i + 1, m]);
+  const years = Array.from({ length: 111 }, (_, i) => [year - i, year - i]);
+  return `<div class="dobrow" role="group" aria-labelledby="dob-label">
+    <select id="dob-d" aria-label="Day" autocomplete="bday-day">${opts(days, "Day")}</select>
+    <select id="dob-m" aria-label="Month" autocomplete="bday-month">${opts(months, "Month")}</select>
+    <select id="dob-y" aria-label="Year" autocomplete="bday-year">${opts(years, "Year")}</select>
+    <input type="hidden" id="dob" value="">
+  </div>`;
+}
+function bindDob() {
+  const d = $("#dob-d"), m = $("#dob-m"), y = $("#dob-y"), out = $("#dob");
+  if (!d) return;
+  const sync = () => {
+    const day = Number(d.value), mon = Number(m.value), yr = Number(y.value);
+    if (day && mon && yr) {                                   // keep the day inside the month (31 February is not a date)
+      const last = new Date(yr, mon, 0).getDate();
+      if (day > last) d.value = String(last);
+    }
+    out.value = d.value && m.value && y.value ? `${y.value}-${String(m.value).padStart(2, "0")}-${String(d.value).padStart(2, "0")}` : "";
+    out.dispatchEvent(new Event("input"));
+  };
+  [d, m, y].forEach((el) => el.addEventListener("change", sync));
+}
+
 function viewLogin() {
   const create = mode === "create";
   const pwField = (id, label, extra = "") => `<div class="fgroup"><label for="${id}">${label}</label>${extra}<div class="pwwrap"><input type="password" id="${id}" autocomplete="${id === "pw" && !create ? "current-password" : "new-password"}" maxlength="128" required><button type="button" class="pwtoggle" data-for="${id}" aria-label="Show password">${icon("eye", 18)}</button></div></div>`;
@@ -117,24 +151,27 @@ function viewLogin() {
         <h1>Train memory and attention, <em>one calm game at a time.</em></h1>
         <p class="lede">A short assessment finds a comfortable starting level. Then a daily session of ten games adapts to you, with a clear report after every day.</p>
         <ul>
-          <li><span class="ic-wrap">${icon("target", 20)}</span><div><b>Games matched to age</b><span>Separate sets for ages 1 to 5, 6 to 17 and 18 to 60, built on classic memory and attention tasks.</span></div></li>
+          <li><span class="ic-wrap">${icon("target", 20)}</span><div><b>Games matched to you</b><span>Activities chosen to suit your age and the way you like to learn, built on classic memory and attention tasks.</span></div></li>
           <li><span class="ic-wrap">${icon("chart", 20)}</span><div><b>Progress you can see</b><span>Charts compare each day with the assessment, skill by skill, and move the level up or down.</span></div></li>
           <li><span class="ic-wrap">${icon("shield", 20)}</span><div><b>Private by design</b><span>${Cloud.enabled ? "Your account and results are saved securely in your own cloud project." : "Accounts and results stay in this browser on this computer."}</span></div></li>
         </ul>
       </div>
-      <div class="groups" aria-label="Age groups"><span>Ages 1 to 5</span><span>Ages 6 to 17</span><span>Ages 18 to 60</span></div>
     </section>
     <section class="authside"><div class="authcard reveal">
       <h2>${create ? "Create your account" : "Welcome back"}</h2>
-      <p class="sub">${create ? "It takes a minute. Your age decides which set of games you will see." : "Sign in to carry on where you stopped."}</p>
+      <p class="sub">${create ? "It takes a minute. We use your age to choose games that suit you." : "Sign in to carry on where you stopped."}</p>
       <div class="seg" role="tablist" aria-label="Sign in or create an account"><button type="button" role="tab" id="tab-in" aria-selected="${!create}">Sign in</button><button type="button" role="tab" id="tab-new" aria-selected="${create}">Create account</button></div>
       <form id="login" novalidate>
         ${create ? `
         <div class="fgroup"><label for="name">Name</label><input type="text" id="name" maxlength="40" autocomplete="name" required></div>
         <div class="fields-2">
-          <div class="fgroup"><label for="age">Age</label><input type="text" id="age" inputmode="numeric" maxlength="2" autocomplete="off" required><p class="help" id="agegroup">In years, 1 to 60.</p></div>
+          <div class="fgroup"><label for="dob-d" id="dob-label">Date of birth</label>${dobField()}<p class="help" id="agegroup">Your age is worked out from this.</p></div>
           <div class="fgroup"><label for="cond">Health condition <span class="optional">(optional)</span></label><input type="text" id="cond" maxlength="80" autocomplete="off" placeholder="Leave empty if not applicable"><p class="help">Shown on your reports.</p></div>
-        </div>` : ""}
+        </div>
+        <fieldset class="fgroup thinking" id="thinkwrap" hidden>
+          <legend>Which describes how you like to learn?</legend>
+          ${THINKING_LEVELS.map((t, i) => `<label class="thinkopt"><input type="radio" name="thinking" value="${t.id}" ${i === 1 ? "checked" : ""}><span><b>${t.label}</b><small>${t.help}</small></span></label>`).join("")}
+        </fieldset>` : ""}
         <div class="fgroup"><label for="email">Email</label><input type="email" id="email" inputmode="email" autocomplete="email" maxlength="120" required></div>
         ${pwField("pw", "Password", create ? `<p class="help">At least ${L.PASSWORD_MIN} characters.</p>` : "")}
         ${create ? pwField("pw2", "Confirm password") : ""}
@@ -143,16 +180,17 @@ function viewLogin() {
       </form>
       <p class="fineprint">${icon("lock", 16)}<span>${Cloud.enabled ? "Passwords are handled by Firebase and never stored by this site." : "Passwords are stored only as a salted hash in this browser."}</span></p>
     </div></section></div>`);
-  $("#tab-in").onclick = () => { mode = "signin"; viewLogin(); };
-  $("#tab-new").onclick = () => { mode = "create"; viewLogin(); };
+  $("#tab-in").onclick = () => { mode = "signin"; viewLogin(); Guide.update("login", null, { mode }); };
+  $("#tab-new").onclick = () => { mode = "create"; viewLogin(); Guide.update("login", null, { mode }); };
   document.querySelectorAll(".pwtoggle").forEach((b) => (b.onclick = () => {
     const inp = $(`#${b.dataset.for}`), show = inp.type === "password";
     inp.type = show ? "text" : "password"; b.innerHTML = icon(show ? "eyeoff" : "eye", 18); b.setAttribute("aria-label", show ? "Hide password" : "Show password");
   }));
-  const age = $("#age");
-  if (age) age.oninput = () => {
-    const g = L.groupForAge(/^\d+$/.test(age.value.trim()) ? Number(age.value) : NaN), h = $("#agegroup");
-    h.textContent = g ? `Age group: ${g.label}` : "In years, 1 to 60."; h.classList.toggle("ok", !!g);
+  bindDob();
+  const dob = $("#dob");
+  if (dob) dob.oninput = () => {
+    const n = L.ageOn(dob.value, S.today());
+    $("#thinkwrap").hidden = !L.needsThinkingLevel(n);          // only people above the last age band are asked how they like to learn
   };
   const showErr = (msg) => { const e = $("#err"); e.hidden = !msg; $("#errtext").textContent = msg || ""; };
   $("#login").onsubmit = async (e) => {
@@ -161,12 +199,32 @@ function viewLogin() {
     btn.classList.add("loading"); btn.textContent = create ? "Creating…" : "Signing in…"; showErr("");
     const val = (id) => ($(id) ? $(id).value : "");
     const r = create
-      ? await createAccount(S.state, { name: val("#name"), age: val("#age"), condition: val("#cond"), email: val("#email"), password: val("#pw"), confirm: val("#pw2") }, new Date().toISOString())
+      ? await createAccount(S.state, { name: val("#name"), dob: val("#dob"), condition: val("#cond"), thinking: (document.querySelector("input[name=thinking]:checked") || {}).value, email: val("#email"), password: val("#pw"), confirm: val("#pw2") }, new Date().toISOString())
       : await signInAccount(S.state, { email: val("#email"), password: val("#pw") });
     if (r.error) { showErr(r.error); btn.classList.remove("loading"); btn.textContent = label; return; }
     S.state.activeKey = r.profile.key; S.save(); mode = "signin";
     if (create && Cloud.enabled && !(await Cloud.flush())) alert("Your account was created, but saving your details to the cloud did not work yet. They will be saved again with your next change.");
     nav(canonical(r.profile));
+  };
+}
+
+// ------------------------------------------------------- date of birth (older accounts)
+function viewDob(p) {
+  setMain(`<div class="page"><div class="wrap reveal"><div class="card" style="max-width:30rem;margin:2rem auto">
+    <h1 style="font-size:1.6rem;margin-bottom:.6rem">One quick thing, ${esc(p.name.trim().split(/\s+/)[0])}</h1>
+    <p class="lede" style="font-size:1rem">Please add your date of birth. It keeps your age up to date and helps choose games that suit you as you grow.</p>
+    <form id="dobf" novalidate>
+      <div class="fgroup"><label for="dob-d" id="dob-label">Date of birth</label>${dobField()}</div>
+      <div class="form-err" id="err" role="alert" hidden>${icon("info", 18)}<span id="errtext"></span></div>
+      <button class="btn lg" type="submit" style="width:100%">Continue</button>
+    </form></div></div></div>`);
+  bindDob();
+  $("#dobf").onsubmit = (e) => {
+    e.preventDefault();
+    const v = L.validateDob($("#dob").value, S.today());
+    if (v.error) { $("#err").hidden = false; $("#errtext").textContent = v.error; return; }
+    p.dob = v.dob; L.syncAge(p, S.today()); S.save();
+    nav(canonical(p));
   };
 }
 
