@@ -126,3 +126,13 @@ Everything stays on this computer. Stored: profile and preferences (browser stor
 * Camera tracking was verified on synthetic frames (statuses, guidance, geometry) and the launch handoff; it still needs a real-world pass with a webcam and with the people it is for. Gesture thresholds are first guesses and are configurable.
 * Starting levels come from five games, so treat them as a comfortable place to begin.
 * Difficulty dimensions and thresholds are reasoned defaults, not clinically validated, and should be reviewed with autistic players, caregivers and clinicians before wider use.
+
+## Virtual therapist and skills practice (autism support)
+
+Flow: sign in -> assessment -> assessment report -> **virtual therapist session (Dr. Sarah)** -> therapist report -> **Skills** (daily game queue) -> daily sessions and reports.
+
+- The therapist session asks 7 short questions (English, Hindi, Tamil; read aloud, answered by tapping, typing or speaking) and plays 4 short motor games (Tiny Dots, Shape Tracing, Big Reach, Follow the Bunny).
+- It scores four skill areas: Cognitive, Communication, Fine Motor, Gross Motor (plus Social-Emotional). Anything below 75 is "focus".
+- The Skills page builds a daily queue of 10 to 15 games, focus skills first. Each skill's level moves up after 3 good rounds in a row and down after 2 hard ones.
+- Code: `web/js/therapy/` (engine.js is pure logic; session.js, skills.js, report.js are screens; games/ holds the 16 games). Tests: `node --test tests/therapy.test.mjs`.
+- This is a play-based screening, not a diagnosis. Its scoring rubric is simple and should be reviewed with a qualified professional.
