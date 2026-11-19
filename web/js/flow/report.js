@@ -1,6 +1,7 @@
 // Report pages. They read only the saved report, so an old report never changes.
 import { GROUPS, LEVEL_LABEL, RULES, bandLabel } from "./data.js";
 import { MEANINGFUL } from "./logic.js";
+import { therapyReport, therapyTitle, therapySummary } from "../therapy/report.js";
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const group = (id) => GROUPS.find((g) => g.id === id);
@@ -191,6 +192,6 @@ export function dailyReport(r) {
 </article>`;
 }
 
-export const reportHtml = (r) => (r.type === "assessment" ? assessmentReport(r) : dailyReport(r));
-export const reportTitle = (r) => (r.type === "assessment" ? "Initial assessment" : `Day ${r.day} · ${LEVEL_LABEL[r.level]}`);
-export const reportSummary = (r) => (r.type === "assessment" ? `${r.overallAccuracy}% overall · starts at ${LEVEL_LABEL[r.level]}` : `${r.accuracy}% · ${r.decision.action === "promote" ? "moves up to" : r.decision.action === "demote" ? "moves down to" : "stays at"} ${LEVEL_LABEL[r.nextLevel]}`);
+export const reportHtml = (r) => (r.type === "assessment" ? assessmentReport(r) : r.type === "therapy" ? therapyReport(r) : dailyReport(r));
+export const reportTitle = (r) => (r.type === "assessment" ? "Initial assessment" : r.type === "therapy" ? therapyTitle(r) : `Day ${r.day} · ${LEVEL_LABEL[r.level]}`);
+export const reportSummary = (r) => (r.type === "therapy" ? therapySummary(r) : r.type === "assessment" ? `${r.overallAccuracy}% overall · starts at ${LEVEL_LABEL[r.level]}` : `${r.accuracy}% · ${r.decision.action === "promote" ? "moves up to" : r.decision.action === "demote" ? "moves down to" : "stays at"} ${LEVEL_LABEL[r.nextLevel]}`);
